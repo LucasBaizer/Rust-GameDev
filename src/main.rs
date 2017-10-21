@@ -3,7 +3,6 @@ extern crate glium;
 extern crate image;
 extern crate nalgebra;
 extern crate obj;
-extern crate ndarray;
 
 mod camera;
 mod object;
@@ -23,9 +22,14 @@ fn main() {
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
 
     use game;
-    let blocks: game::Blocks = game::Blocks::new();
-    let mut game: game::Game = game::Game::new(blocks.block_stone);
-    game.world.set_block(0, 0, 0, blocks.block_stone);
+    let blocks: game::Blocks = game::Blocks::new(&mut display);
+    let mut game: game::Game = game::Game::new(0);
+
+    match blocks.block_map.get(&0) {
+        Some(block) => game.world.set_block(0, 0, 0, block),
+        _ => ()
+    }
+    
 
     let screen_size = display.get_framebuffer_dimensions();
 
@@ -61,11 +65,11 @@ fn main() {
         translation_matrix[(1, 3)] = 0.0;
         translation_matrix[(2, 3)] = 0.0;
 
-        let block: game::Block = game.world.get_block(0, 0, 0);
+        let block: &game::Block = game.world.get_block(&blocks, 0, 0, 0);
         let transform_matrix: [[f32; 4]; 4] = /*game_object.get_transform_matrix().into();*/ (translation_matrix * utils::get_identity_matrix() * utils::get_identity_matrix()).into();
-        let texture_2d = block.get_texture_2d(&mut display);
+        let texture_2d = &block.texture;
         let projection_matrix: [[f32; 4]; 4] = projection_matrix.into();
-        target.draw(&block.get_vertex_buffer(&mut display), &block.get_index_buffer(&mut display), &program, &uniform! { sampler: &texture_2d, transform: transform_matrix, projection_matrix: projection_matrix },
+        target.draw(&block.get_vertex_buffer(&mut display), &block.get_index_buffer(&mut display), &program, &uniform! { sampler: texture_2d, transform: transform_matrix, projection_matrix: projection_matrix },
             &Default::default()).unwrap();
         target.finish().unwrap();
 

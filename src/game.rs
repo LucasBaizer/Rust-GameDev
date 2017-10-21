@@ -1,53 +1,53 @@
-pub struct Game<'a> {
-	pub world: World<'a>
+pub struct Game {
+	pub world: World
 }
 
-impl<'a> Game<'a> {
-	pub fn new(air_block: Block<'a>) -> Game<'a> {
+impl Game {
+	pub fn new(air_block: u8) -> Game {
 		Game {
 			world: create_world(air_block)
 		}
 	}
 }
 
-pub struct World<'a> {
-	chunks: [[Chunk<'a>; 16]; 16]
+pub struct World {
+	chunks: [[Chunk; 16]; 16]
 }
 
-impl<'a> World<'a> {
-	pub fn get_block(&mut self, x: u32, y: u32, z: u32) -> Block {
-		self.chunks[(x >> 4) as usize][(y >> 4) as usize].blocks[(x & 15) as usize][(z & 15) as usize][y as usize]
+impl World {
+	pub fn get_block(&mut self, blocks: &Blocks, x: u32, y: u32, z: u32) -> &Block {
+		let mut block_ref: &'static Option<&Block> = &blocks.block_map.get(&self.chunks[(x >> 4) as usize][(y >> 4) as usize].blocks[(x & 15) as usize][(z & 15) as usize][y as usize]);
+		match block_ref {
+        	Some(*block) => block,
+       		_ => panic!()
+   		}
 	}
 
-	pub fn set_block(&mut self, x: u32, y: u32, z: u32, block: Block<'a>) {
-		self.chunks[(x >> 4) as usize][(z >> 4) as usize].blocks[(x & 15) as usize][(z & 15) as usize][y as usize] = block;
+	pub fn set_block(&mut self, x: u32, y: u32, z: u32, block: &Block) {
+		self.chunks[(x >> 4) as usize][(z >> 4) as usize].blocks[(x & 15) as usize][(z & 15) as usize][y as usize] = block.id;
 	}
 }
 
-use ndarray::Array3;
-
-pub struct Chunk<'a> {
-	//blocks: [[[Block<'a>; 255]; 16]; 16]
-	blocks: Array3
+pub struct Chunk {
+	blocks: [[[u8; 255]; 16]; 16]
 }
 
 use glium;
 
-pub struct Block<'a> {
-	pub image: glium::texture::RawImage2d<'a, u8>
+pub struct Block {
+	pub id: u8,
+	//pub image: glium::texture::RawImage2d<'static, u8>
+	pub texture: glium::texture::Texture2d
 }
 
 use utils;
 
-impl<'a> Block<'a> {
-	pub fn new(img: &str) -> Block<'static> {
+impl Block {
+	pub fn new(display: &mut glium::Display, img: &str, id: u8) -> Block {
 		Block {
-			image: utils::load_image_from_file(img)
+			texture: glium::texture::Texture2d::new(display, utils::load_image_from_file(img)).unwrap(),
+			id: id
 		}
-	}
-
-	pub fn get_texture_2d(&self, display: &mut glium::Display) -> glium::texture::Texture2d {
-		glium::texture::Texture2d::new(display, self.image).unwrap()
 	}
 
 	pub fn get_vertex_buffer(&self, display: &mut glium::Display) -> glium::VertexBuffer<Vertex> {
@@ -61,20 +61,23 @@ impl<'a> Block<'a> {
 	}
 }
 
-pub struct Blocks<'a> {
-	pub block_stone: Block<'a>
+use std::collections::HashMap;
+pub struct Blocks {
+	pub block_map: &'static mut HashMap<u8, Block>
 }
 
-impl<'a> Blocks<'a> {
-	pub fn new() -> Blocks<'a> {
-		Blocks {
-			block_stone: Block::new("models/stone.png")
-		}
+impl Blocks {
+	pub fn new(display: &mut glium::Display) -> Blocks {
+		let blocks = Blocks {
+			block_map: &mut HashMap::new()
+		};
+		blocks.block_map.insert(0, Block::new(display, "models/stone.png", 0));
+		blocks
 	}
 }
 
-pub fn create_world<'a>(air_block: Block<'a>) -> World<'a> {
-	let mut chunk_array: [[Chunk<'a>; 16]; 16];
+pub fn create_world(air_block: u8) -> World {
+	let mut chunk_array: [[Chunk; 16]; 16];
 
 	for x in 0..16 {
 		for z in 0..16 {
@@ -87,8 +90,8 @@ pub fn create_world<'a>(air_block: Block<'a>) -> World<'a> {
 	}
 }
 
-fn create_chunk<'a>(air_block: Block<'a>) -> Chunk<'a> {
-	let mut block_array: [[[Block<'a>; 255]; 16]; 16];
+fn create_chunk(air_block: u8) -> Chunk {
+	let mut block_array: [[[u8; 255]; 16]; 16];
 
 	for x in 0..16 {
 		for z in 0..16 {
