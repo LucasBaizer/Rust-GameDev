@@ -15,12 +15,8 @@ pub struct World {
 }
 
 impl World {
-	pub fn get_block(&mut self, blocks: &Blocks, x: u32, y: u32, z: u32) -> &Block {
-		let mut block_ref: &'static Option<&Block> = &blocks.block_map.get(&self.chunks[(x >> 4) as usize][(y >> 4) as usize].blocks[(x & 15) as usize][(z & 15) as usize][y as usize]);
-		match block_ref {
-        	Some(*block) => block,
-       		_ => panic!()
-   		}
+	pub fn get_block(&mut self, blocks: &'static Blocks, x: u32, y: u32, z: u32) -> &'static Block {
+		blocks.block_map.get(&self.chunks[(x >> 4) as usize][(y >> 4) as usize].blocks[(x & 15) as usize][(z & 15) as usize][y as usize]).unwrap()
 	}
 
 	pub fn set_block(&mut self, x: u32, y: u32, z: u32, block: &Block) {
@@ -67,16 +63,19 @@ pub struct Blocks {
 }
 
 impl Blocks {
-	pub fn new(display: &mut glium::Display) -> Blocks {
-		let blocks = Blocks {
+	pub fn new() -> Blocks {
+		Blocks {
 			block_map: &mut HashMap::new()
-		};
-		blocks.block_map.insert(0, Block::new(display, "models/stone.png", 0));
-		blocks
+		}
+	}
+
+	pub fn initialize(&mut self, display: &mut glium::Display) {
+		self.block_map.insert(0, Block::new(display, "models/stone.png", 0));
 	}
 }
 
 pub fn create_world(air_block: u8) -> World {
+	use std::ptr;
 	let mut chunk_array: [[Chunk; 16]; 16];
 
 	for x in 0..16 {

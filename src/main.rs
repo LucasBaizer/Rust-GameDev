@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate glium;
+#[macro_use]
+extern crate lazy_static;
 extern crate image;
 extern crate nalgebra;
 extern crate obj;
@@ -22,14 +24,12 @@ fn main() {
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
 
     use game;
-    let blocks: game::Blocks = game::Blocks::new(&mut display);
+    let blocks: &'static game::Blocks = &game::Blocks::new();
+    blocks.initialize(&mut display);
+
     let mut game: game::Game = game::Game::new(0);
 
-    match blocks.block_map.get(&0) {
-        Some(block) => game.world.set_block(0, 0, 0, block),
-        _ => ()
-    }
-    
+    game.world.set_block(0, 0, 0, blocks.block_map.get(&0).unwrap());
 
     let screen_size = display.get_framebuffer_dimensions();
 

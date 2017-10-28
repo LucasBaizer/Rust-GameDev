@@ -8,3 +8,4 @@ glium = "0.17.1"
 image = "*"
 nalgebra = "*"
 obj-rs = { version = "0.4", features = ["glium-support"] }
+lazy_static = "*"
