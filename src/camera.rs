@@ -23,8 +23,8 @@ impl Camera {
 	    let mut matrix: nalgebra::Matrix4<f32> = nalgebra::Matrix4::new(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
 	    matrix[(0, 0)] = x_scale;
 	    matrix[(1, 1)] = y_scale;
-	    matrix[(2, 2)] = -((FAR_PLANE + NEAR_PLANE) / frustum_length);
-	    matrix[(3, 2)] = -1.0;
+	    matrix[(2, 2)] = (FAR_PLANE + NEAR_PLANE) / frustum_length;
+	    matrix[(3, 2)] = 1.0;
 	    matrix[(2, 3)] = -((2.0 * NEAR_PLANE * FAR_PLANE) / frustum_length);
 	    matrix[(3, 3)] = 0.0;
 

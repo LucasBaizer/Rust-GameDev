@@ -1,7 +1,5 @@
 #[macro_use]
 extern crate glium;
-#[macro_use]
-extern crate lazy_static;
 extern crate image;
 extern crate nalgebra;
 extern crate obj;
@@ -20,57 +18,61 @@ fn main() {
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let window = glium::glutin::WindowBuilder::new().with_title("Rust Minecraft");
-    let context = glium::glutin::ContextBuilder::new();
+    let context = glium::glutin::ContextBuilder::new().with_depth_buffer(24);;
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
 
+    let params = glium::DrawParameters {
+        depth: glium::Depth {
+            test: glium::draw_parameters::DepthTest::IfLess,
+            write: true,
+            .. Default::default()
+        },
+        .. Default::default()
+    };
+
     use game;
-    let blocks: &'static game::Blocks = &game::Blocks::new();
+    let mut blocks: game::Blocks = game::Blocks::new();
     blocks.initialize(&mut display);
 
     let mut game: game::Game = game::Game::new(0);
 
-    game.world.set_block(0, 0, 0, blocks.block_map.get(&0).unwrap());
+    game.world.set_block(0, 0, 0, blocks.get_block(0));
 
     let screen_size = display.get_framebuffer_dimensions();
 
     let mut closed = false;
 
-    /*(let bytes = utils::file_to_bytes("rust_logo.jpg");
-
-	let image = image::load(Cursor::new(&bytes), image::JPEG).unwrap().to_rgba();
-	let image_dimensions = image.dimensions();
-	let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw()[..], image_dimensions);
-	let texture = glium::texture::Texture2d::new(&display, image).unwrap();*/
-
     use game::Vertex;
 	implement_vertex!(Vertex, position, uv);
-
-	//let vertex_buffer = game_object.get_vertex_buffer(&mut display);
-	//let indices = glium::index::NoIndices(glium::index::PrimitiveType::Points);
-    //let indices = game_object.get_index_buffer(&mut display);
 
 	let vertex_shader_src = utils::file_to_string("shaders/vertex.glsl");
 	let fragment_shader_src = utils::file_to_string("shaders/fragment.glsl");
 
 	let program = glium::Program::from_source(&display, &vertex_shader_src, &fragment_shader_src, None).unwrap();
-
+    let mut block_angles: f32 = 0.0;
     let projection_matrix: nalgebra::Matrix4<f32> = camera.create_projection_matrix(screen_size);
     while !closed {
         let mut target = display.draw();
-        target.clear_color(1.0, 1.0, 1.0, 1.0);
+        target.clear_color_and_depth((1.0, 1.0, 1.0, 1.0), 1.0);
 
         let mut translation_matrix: nalgebra::Matrix4<f32> = utils::get_identity_matrix();
+        let mut rotation_matrix: nalgebra::Matrix4<f32> = utils::get_identity_matrix();
 
         translation_matrix[(0, 3)] = 0.0;
         translation_matrix[(1, 3)] = 0.0;
-        translation_matrix[(2, 3)] = 0.0;
+        translation_matrix[(2, 3)] = 5.0;
+        rotation_matrix[(0, 0)] = f32::cos(f32::to_radians(block_angles));
+        rotation_matrix[(2, 0)] = f32::sin(f32::to_radians(block_angles));
+        rotation_matrix[(0, 2)] = -f32::sin(f32::to_radians(block_angles));
+        rotation_matrix[(2, 2)] = f32::cos(f32::to_radians(block_angles));
+        block_angles = block_angles + 0.05;
 
         let block: &game::Block = game.world.get_block(&blocks, 0, 0, 0);
-        let transform_matrix: [[f32; 4]; 4] = /*game_object.get_transform_matrix().into();*/ (translation_matrix * utils::get_identity_matrix() * utils::get_identity_matrix()).into();
+        let transform_matrix: [[f32; 4]; 4] = /*game_object.get_transform_matrix().into();*/ (translation_matrix * rotation_matrix * utils::get_identity_matrix()).into();
         let texture_2d = &block.texture;
         let projection_matrix: [[f32; 4]; 4] = projection_matrix.into();
-        target.draw(&block.get_vertex_buffer(&mut display), &block.get_index_buffer(&mut display), &program, &uniform! { sampler: texture_2d, transform: transform_matrix, projection_matrix: projection_matrix },
-            &Default::default()).unwrap();
+        target.draw(&block.get_vertex_buffer(&mut display), &block.get_index_buffer(&mut display), &program, &uniform! { sampler: texture_2d.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest), transform: transform_matrix, projection_matrix: projection_matrix },
+            &params).unwrap();
         target.finish().unwrap();
 
         events_loop.poll_events(|ev| {

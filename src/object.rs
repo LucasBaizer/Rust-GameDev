@@ -1,4 +1,4 @@
-use nalgebra;
+/*use nalgebra;
 use obj;
 
 pub struct GameObject {
@@ -90,4 +90,4 @@ impl GameObject {
 	pub fn scale(&mut self, increase: nalgebra::Vector3<f32>) {
 		self.scale += increase;
 	}
-}
+}*/

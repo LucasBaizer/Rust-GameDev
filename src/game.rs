@@ -11,11 +11,11 @@ impl Game {
 }
 
 pub struct World {
-	chunks: [[Chunk; 16]; 16]
+	chunks: Vec<Vec<Chunk>>
 }
 
 impl World {
-	pub fn get_block(&mut self, blocks: &'static Blocks, x: u32, y: u32, z: u32) -> &'static Block {
+	pub fn get_block<'a>(&mut self, blocks: &'a Blocks, x: u32, y: u32, z: u32) -> &'a Block {
 		blocks.block_map.get(&self.chunks[(x >> 4) as usize][(y >> 4) as usize].blocks[(x & 15) as usize][(z & 15) as usize][y as usize]).unwrap()
 	}
 
@@ -25,7 +25,7 @@ impl World {
 }
 
 pub struct Chunk {
-	blocks: [[[u8; 255]; 16]; 16]
+	blocks: Vec<Vec<Vec<u8>>>
 }
 
 use glium;
@@ -47,40 +47,72 @@ impl Block {
 	}
 
 	pub fn get_vertex_buffer(&self, display: &mut glium::Display) -> glium::VertexBuffer<Vertex> {
-		let vertices = vec![Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, -0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, 0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, 0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, 0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, 0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, -0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, -0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, -0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, -0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, -0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, 0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [0.5, 0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 0.0] }, Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0] }];
+		let mut vertices = vec![Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 1.0] }, //0
+								Vertex { position: [0.5, -0.5, 0.5], uv: [1.0, 1.0] }, //1
+								Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0] }, //2
+								Vertex { position: [0.5, 0.5, 0.5], uv: [1.0, 0.0] }, //3
+								Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0] }, //4
+								Vertex { position: [0.5, 0.5, 0.5], uv: [1.0, 0.0] }, //5
+								Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 1.0] }, //6
+								Vertex { position: [0.5, 0.5, -0.5], uv: [1.0, 0.0] }, //7
+								Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 0.0] }, //8
+								Vertex { position: [0.5, 0.5, -0.5], uv: [1.0, 0.0] }, //9
+								Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 1.0] }, //10
+								Vertex { position: [0.5, -0.5, -0.5], uv: [1.0, 1.0] }, //11
+								Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 1.0] }, //12
+								Vertex { position: [0.5, -0.5, -0.5], uv: [1.0, 1.0] }, //13
+								Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 1.0] }, //14
+								Vertex { position: [0.5, -0.5, 0.5], uv: [1.0, 1.0] }, //15
+								Vertex { position: [0.5, -0.5, 0.5], uv: [0.0, 1.0] }, //16
+								Vertex { position: [0.5, -0.5, -0.5], uv: [1.0, 1.0] }, //17
+								Vertex { position: [0.5, 0.5, 0.5], uv: [0.0, 0.0] }, //18
+								Vertex { position: [0.5, 0.5, -0.5], uv: [1.0, 0.0] }, //19
+								Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 1.0] }, //20
+								Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 1.0] }, //21
+								Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 0.0] }, //22
+								Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0] } //23
+								];
+		for v in &mut vertices {
+			v.uv[1] = 1.0 - v.uv[1];
+		}
 		glium::VertexBuffer::new(display, &vertices).unwrap()
 	}
 
 	pub fn get_index_buffer(&self, display: &mut glium::Display) -> glium::IndexBuffer<u16> {
-		let indices = vec![0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7, 8, 9, 10, 10, 9, 11, 12, 13, 14, 14, 13, 15, 16, 17, 18, 18, 17, 19, 20, 21, 22, 22, 21, 23];
+		//let indices = vec![0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7, 8, 9, 10, 10, 9, 11, 12, 13, 14, 14, 13, 15, 16, 17, 18, 18, 17, 19, 20, 21, 22, 22, 21, 23];
+		let indices = vec![16, 17, 18];
 		glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap()
 	}
 }
 
 use std::collections::HashMap;
 pub struct Blocks {
-	pub block_map: &'static mut HashMap<u8, Block>
+	pub block_map: HashMap<u8, Block>
 }
 
 impl Blocks {
 	pub fn new() -> Blocks {
 		Blocks {
-			block_map: &mut HashMap::new()
+			block_map: HashMap::new()
 		}
 	}
 
 	pub fn initialize(&mut self, display: &mut glium::Display) {
 		self.block_map.insert(0, Block::new(display, "models/stone.png", 0));
 	}
+
+	pub fn get_block(&self, id: u8) -> &Block {
+		self.block_map.get(&id).unwrap()
+	}
 }
 
 pub fn create_world(air_block: u8) -> World {
-	use std::ptr;
-	let mut chunk_array: [[Chunk; 16]; 16];
+	let mut chunk_array = Vec::with_capacity(16);
 
 	for x in 0..16 {
-		for z in 0..16 {
-			chunk_array[x][z] = create_chunk(air_block);
+		chunk_array.push(Vec::with_capacity(16));
+		for _ in 0..16 {
+			chunk_array[x].push(create_chunk(air_block));
 		}
 	}
 
@@ -90,12 +122,14 @@ pub fn create_world(air_block: u8) -> World {
 }
 
 fn create_chunk(air_block: u8) -> Chunk {
-	let mut block_array: [[[u8; 255]; 16]; 16];
+	let mut block_array = Vec::with_capacity(16);
 
 	for x in 0..16 {
+		block_array.push(Vec::with_capacity(16));
 		for z in 0..16 {
-			for y in 0..256 {
-				block_array[x][z][y] = air_block;
+			block_array[x].push(Vec::with_capacity(255));
+			for _ in 0..256 {
+				block_array[x][z].push(air_block);
 			}
 		}
 	}
@@ -111,11 +145,11 @@ pub struct Vertex {
     pub uv: [f32; 2],
 }
 
-impl Vertex {
+/*impl Vertex {
     pub fn new() -> Vertex {
         Vertex {
             position: [0.0; 3],
             uv: [0.0; 2]
         }
     }
-}
+}*/
