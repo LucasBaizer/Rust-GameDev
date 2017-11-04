@@ -29,16 +29,25 @@ impl World {
 		self.get_block(blocks, pos.x, pos.y, pos.z)
 	}
 
+	pub fn get_block_id_at_pos(&self, pos: &BlockPos) -> u8 {
+		self.get_block_id(pos.x, pos.y, pos.z)
+	}
+
 	pub fn get_block<'a>(&self, blocks: &'a Blocks, x: u32, y: u8, z: u32) -> &'a Block {
 		blocks.block_map.get(&self.get_block_id(x, y, z)).unwrap()
 	}
 
 	pub fn set_block(&mut self, x: u32, y: u8, z: u32, block: &Block) {
-		self.set_block_ignore_neighbors(x, y, z, block);
+		self.set_block_ignore_neighbors(x, y, z, block.id);
+
+		for block_pos in &mut self.get_neighbors(x as i64, y as i16, z as i64) {
+			if block_pos.block_id != 0 {
+				self.set_block_ignore_neighbors(block_pos.x, block_pos.y, block_pos.z, block_pos.block_id);
+			}
+		}
 	}
 
-	fn set_block_ignore_neighbors(&mut self, x: u32, raw_y: u8, z: u32, block: &Block) {
-		let mut chunk = &mut self.chunks[(x >> 4) as usize][(z >> 4) as usize];
+	fn set_block_ignore_neighbors(&mut self, x: u32, raw_y: u8, z: u32, block: u8) {
 		let x = (x & 15) as u8;
 		let y = raw_y as u8;
 		let z = (z & 15) as u8;
@@ -47,13 +56,18 @@ impl World {
 		let uy = y as usize;
 		let uz = z as usize;
 
-		chunk.blocks[ux][uz][uy] = block.id;
+		self.chunks[(x >> 4) as usize][(z >> 4) as usize].blocks[ux][uz][uy] = block;
 
-		for block_pos in self.get_neighbors(x as i64, y as i16, z as i64) {
-			if self.get_block_at_pos(block_pos).id != 0 {
-
+		if block != 0 {
+			for block_pos in &mut self.get_neighbors(x as i64, y as i16, z as i64) {
+				if block_pos.block_id == 0 {
+					self.chunks[(x >> 4) as usize][(z >> 4) as usize].visible_blocks.insert(BlockPos::new(x as u32, y, z as u32, block));
+					return;
+				}
 			}
 		}
+
+		self.chunks[(x >> 4) as usize][(z >> 4) as usize].visible_blocks.remove(&BlockPos::new(x as u32, y, z as u32, block));
 	}
 	
 	pub fn is_in_world_bounds(&self, x: i64, y: i16, z: i64) -> bool {
@@ -63,10 +77,12 @@ impl World {
 	fn add_if_in_bounds(&self, vec: &mut Vec<BlockPos>, x: i64, y: i16, z: i64) {
 		if self.is_in_world_bounds(x, y, z) {
 			vec.push(BlockPos::new(x as u32, y as u8, z as u32, self.get_block_id(x as u32, y as u8, z as u32)));
+		} else {
+			vec.push(BlockPos::new(0, 0, 0, 0));
 		}
 	}
 
-	pub fn get_neighbors(&self, x: i64, y: i16, z: i64) -> Vec<BlockPos> {
+	pub fn get_neighbors(&mut self, x: i64, y: i16, z: i64) -> Vec<BlockPos> {
 		let mut neighbors = Vec::new();
 
 		self.add_if_in_bounds(&mut neighbors, x - 1, y, z);
@@ -100,7 +116,7 @@ impl World {
 	}
 }
 
-#[derive(Hash)]
+#[derive(Hash, Debug)]
 pub struct BlockPos {
 	pub x: u32,
 	pub y: u8,
@@ -118,6 +134,14 @@ impl BlockPos {
 		}
 	}
 }
+
+impl PartialEq for BlockPos {
+	fn eq(&self, other: &BlockPos) -> bool {
+        self.x == other.x && self.y == other.y && self.z == other.z && self.block_id == other.block_id
+    }
+}
+
+impl Eq for BlockPos {}
 
 use std::collections::HashSet;
 pub struct Chunk {
@@ -142,7 +166,7 @@ impl Block {
 		}
 	}
 
-	pub fn get_vertex_buffer(&self, display: &mut glium::Display) -> glium::VertexBuffer<Vertex> {
+	pub fn get_vertex_buffer(display: &mut glium::Display) -> glium::VertexBuffer<Vertex> {
 		let mut vertices = vec![Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 1.0] }, //0
 								Vertex { position: [0.5, -0.5, 0.5], uv: [1.0, 1.0] }, //1
 								Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0] }, //2
@@ -174,7 +198,7 @@ impl Block {
 		glium::VertexBuffer::new(display, &vertices).unwrap()
 	}
 
-	pub fn get_index_buffer(&self, display: &mut glium::Display) -> glium::IndexBuffer<u16> {
+	pub fn get_index_buffer(display: &mut glium::Display) -> glium::IndexBuffer<u16> {
 		let indices = vec![0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7, 8, 9, 10, 10, 9, 11, 12, 13, 14, 14, 13, 15, 16, 17, 18, 18, 17, 19, 20, 21, 22, 22, 21, 23];
 		glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap()
 	}

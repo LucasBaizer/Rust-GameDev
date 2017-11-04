@@ -25,7 +25,7 @@ fn main() {
     let context = glium::glutin::ContextBuilder::new().with_depth_buffer(24);;
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
 
-    let params = glium::DrawParameters {
+    let params = &glium::DrawParameters {
         depth: glium::Depth {
             test: glium::draw_parameters::DepthTest::IfLess,
             write: true,
@@ -39,9 +39,9 @@ fn main() {
 
     let mut game: game::Game = game::Game::new(0, 2);
 
-    for x in 0..2 {
-        for z in 0..2 {
-            for y in 0..2 {
+    for x in 0..16 {
+        for z in 0..16 {
+            for y in 0..16 {
                 game.world.set_block(x, y, z, blocks.get_block(1));
             }
         }
@@ -60,6 +60,8 @@ fn main() {
 	let program = glium::Program::from_source(&display, &vertex_shader_src, &fragment_shader_src, None).unwrap();
     //.let mut block_angles: f32 = 0.0;
     let projection_matrix: [[f32; 4]; 4] = camera.create_projection_matrix(screen_size).into();
+    let vertex_buffer = &game::Block::get_vertex_buffer(&mut display);
+    let index_buffer = &game::Block::get_index_buffer(&mut display);
 
     while !closed {
         let start = Instant::now();
@@ -73,7 +75,7 @@ fn main() {
         for chunk_x in 0..game.world.chunks.len() {
             for chunk_z in 0..game.world.chunks[chunk_x].len() {
                 let chunk = game.world.get_chunk(chunk_x, chunk_z);
-                let visible_blocks = &chunk.visible_blocks;
+                let visible_blocks = chunk.visible_blocks.iter();
 
                 for block_pos in visible_blocks {
                     let block_world_x = (chunk_x * 16) + block_pos.x as usize;
@@ -87,7 +89,7 @@ fn main() {
 
                         let transform_matrix: [[f32; 4]; 4] = translation_matrix.into();
                         let texture_2d = &block.texture;
-                        target.draw(&block.get_vertex_buffer(&mut display), &block.get_index_buffer(&mut display), &program, &uniform! { sampler: texture_2d.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest), transform: transform_matrix, view_matrix: view_matrix, projection_matrix: projection_matrix }, &params).unwrap();
+                        target.draw(vertex_buffer, index_buffer, &program, &uniform! { sampler: texture_2d.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest), transform: transform_matrix, view_matrix: view_matrix, projection_matrix: projection_matrix }, params).unwrap();
                     }
                 }
             }
