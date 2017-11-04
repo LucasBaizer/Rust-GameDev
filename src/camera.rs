@@ -2,15 +2,21 @@ use nalgebra;
 
 pub struct Camera {
 	field_of_view: f32,
+	position: nalgebra::Vector3<f32>,
+	rotation: nalgebra::Vector3<f32>
 }
 
 const NEAR_PLANE: f32 = 0.001;
 const FAR_PLANE : f32 = 1000.0;
 
+use utils;
+
 impl Camera {
 	pub fn new(fov: u32) -> Camera {
 		Camera {
-			field_of_view: fov as f32
+			field_of_view: fov as f32,
+			position: nalgebra::Vector3::new(0.0, 0.0, 0.0),
+			rotation: nalgebra::Vector3::new(0.0, 0.0, 0.0)
 		}
 	}
 
@@ -29,5 +35,28 @@ impl Camera {
 	    matrix[(3, 3)] = 0.0;
 
 	    matrix
+	}
+
+	pub fn get_view_matrix(&self) -> nalgebra::Matrix4<f32> {
+		let mut translation_matrix: nalgebra::Matrix4<f32> = utils::get_identity_matrix();
+        let mut rotation_matrix: nalgebra::Matrix4<f32> = utils::get_identity_matrix();
+
+        translation_matrix[(0, 3)] = self.position[0];
+        translation_matrix[(1, 3)] = self.position[1];
+        translation_matrix[(2, 3)] = self.position[2];
+        rotation_matrix[(0, 0)] = f32::cos(f32::to_radians(self.rotation[2]));
+        rotation_matrix[(2, 0)] = f32::sin(f32::to_radians(self.rotation[2]));
+        rotation_matrix[(0, 2)] = -f32::sin(f32::to_radians(self.rotation[2]));
+        rotation_matrix[(2, 2)] = f32::cos(f32::to_radians(self.rotation[2]));
+
+        translation_matrix * rotation_matrix
+	}
+
+	pub fn translate(&mut self, translation: nalgebra::Vector3<f32>) {
+		self.position += translation;
+	}
+
+	pub fn rotate(&mut self, rotation: nalgebra::Vector3<f32>) {
+		self.rotation += rotation;
 	}
 }

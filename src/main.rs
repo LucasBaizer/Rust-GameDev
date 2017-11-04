@@ -8,13 +8,17 @@ mod camera;
 mod object;
 mod utils;
 mod game;
+mod input;
 
 fn main() {
     use glium::{glutin, Surface};
+    use glium::glutin::VirtualKeyCode;
+    use std::time::Instant;
+    use std::time::Duration;
+    use std::thread;
 
-    let camera: camera::Camera = camera::Camera::new(60);
-
-    //let mut game_object: object::GameObject = object::GameObject::load_from_obj("models/cube.obj");
+    let mut camera: camera::Camera = camera::Camera::new(90);
+    let mut game_input: input::Input = input::Input::new();
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let window = glium::glutin::WindowBuilder::new().with_title("Rust Minecraft");
@@ -30,13 +34,18 @@ fn main() {
         .. Default::default()
     };
 
-    use game;
     let mut blocks: game::Blocks = game::Blocks::new();
     blocks.initialize(&mut display);
 
-    let mut game: game::Game = game::Game::new(0);
+    let mut game: game::Game = game::Game::new(0, 2);
 
-    game.world.set_block(0, 0, 0, blocks.get_block(0));
+    for x in 0..2 {
+        for z in 0..2 {
+            for y in 0..2 {
+                game.world.set_block(x, y, z, blocks.get_block(1));
+            }
+        }
+    }
 
     let screen_size = display.get_framebuffer_dimensions();
 
@@ -49,53 +58,80 @@ fn main() {
 	let fragment_shader_src = utils::file_to_string("shaders/fragment.glsl");
 
 	let program = glium::Program::from_source(&display, &vertex_shader_src, &fragment_shader_src, None).unwrap();
-    let mut block_angles: f32 = 0.0;
-    let projection_matrix: nalgebra::Matrix4<f32> = camera.create_projection_matrix(screen_size);
+    //.let mut block_angles: f32 = 0.0;
+    let projection_matrix: [[f32; 4]; 4] = camera.create_projection_matrix(screen_size).into();
+
     while !closed {
+        let start = Instant::now();
+
         let mut target = display.draw();
         target.clear_color_and_depth((1.0, 1.0, 1.0, 1.0), 1.0);
 
+        let view_matrix: [[f32; 4]; 4] = camera.get_view_matrix().try_inverse().unwrap().into();
         let mut translation_matrix: nalgebra::Matrix4<f32> = utils::get_identity_matrix();
-        let mut rotation_matrix: nalgebra::Matrix4<f32> = utils::get_identity_matrix();
 
-        translation_matrix[(0, 3)] = 0.0;
-        translation_matrix[(1, 3)] = 0.0;
-        translation_matrix[(2, 3)] = 5.0;
-        rotation_matrix[(0, 0)] = f32::cos(f32::to_radians(block_angles));
-        rotation_matrix[(2, 0)] = f32::sin(f32::to_radians(block_angles));
-        rotation_matrix[(0, 2)] = -f32::sin(f32::to_radians(block_angles));
-        rotation_matrix[(2, 2)] = f32::cos(f32::to_radians(block_angles));
-        block_angles = block_angles + 0.05;
+        for chunk_x in 0..game.world.chunks.len() {
+            for chunk_z in 0..game.world.chunks[chunk_x].len() {
+                let chunk = game.world.get_chunk(chunk_x, chunk_z);
+                let visible_blocks = &chunk.visible_blocks;
 
-        let block: &game::Block = game.world.get_block(&blocks, 0, 0, 0);
-        let transform_matrix: [[f32; 4]; 4] = /*game_object.get_transform_matrix().into();*/ (translation_matrix * rotation_matrix * utils::get_identity_matrix()).into();
-        let texture_2d = &block.texture;
-        let projection_matrix: [[f32; 4]; 4] = projection_matrix.into();
-        target.draw(&block.get_vertex_buffer(&mut display), &block.get_index_buffer(&mut display), &program, &uniform! { sampler: texture_2d.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest), transform: transform_matrix, projection_matrix: projection_matrix },
-            &params).unwrap();
+                for block_pos in visible_blocks {
+                    let block_world_x = (chunk_x * 16) + block_pos.x as usize;
+                    let block_world_z = (chunk_z * 16) + block_pos.z as usize;
+                    let block: &game::Block = game.world.get_block(&blocks, block_world_x as u32, block_pos.y, block_world_z as u32);
+
+                    if block.id > 0 {
+                        translation_matrix[(0, 3)] = block_world_x as f32;
+                        translation_matrix[(1, 3)] = block_pos.y as f32;
+                        translation_matrix[(2, 3)] = block_world_z as f32;
+
+                        let transform_matrix: [[f32; 4]; 4] = translation_matrix.into();
+                        let texture_2d = &block.texture;
+                        target.draw(&block.get_vertex_buffer(&mut display), &block.get_index_buffer(&mut display), &program, &uniform! { sampler: texture_2d.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest), transform: transform_matrix, view_matrix: view_matrix, projection_matrix: projection_matrix }, &params).unwrap();
+                    }
+                }
+            }
+        }
+
         target.finish().unwrap();
+
+        let ms = start.elapsed().as_secs() * 1000;
+        if ms < 10 {
+            thread::sleep(Duration::from_millis(10 - ms));
+        }
+
+        if game_input.get_key(VirtualKeyCode::W) {
+            camera.translate(utils::get_forward_vector() / 32.0);
+        } else if game_input.get_key(VirtualKeyCode::S) {
+            camera.translate(-utils::get_forward_vector() / 32.0);
+        }
+
+        if game_input.get_key(VirtualKeyCode::A) {
+            camera.translate(-utils::get_right_vector() / 32.0);
+        } else if game_input.get_key(VirtualKeyCode::D) {
+            camera.translate(utils::get_right_vector() / 32.0);
+        }
+
+        if game_input.get_key(VirtualKeyCode::Space) {
+            camera.translate(utils::get_up_vector() / 32.0);
+        } else if game_input.get_key(VirtualKeyCode::LControl) {
+            camera.translate(-utils::get_up_vector() / 32.0);
+        }
 
         events_loop.poll_events(|ev| {
             match ev {
                 glutin::Event::WindowEvent { event, .. } => match event {
                 	glutin::WindowEvent::Closed => closed = true,
-                	/*glutin::WindowEvent::KeyboardInput { input, .. } => match input.state {
-                        glutin::ElementState::Pressed => match input.virtual_keycode {                 
-                		    Some(glutin::VirtualKeyCode::Escape) => closed = true,
-                		    Some(glutin::VirtualKeyCode::Left) => game_object.translate(-utils::get_right_vector()),
-                		    Some(glutin::VirtualKeyCode::Right) => game_object.translate(utils::get_right_vector()),
-                		    Some(glutin::VirtualKeyCode::Up) => game_object.translate(utils::get_up_vector()),
-                		    Some(glutin::VirtualKeyCode::Down) => game_object.translate(-utils::get_up_vector()),
-                            Some(glutin::VirtualKeyCode::Space) => game_object.scale(utils::get_one_vector() / 10.0),
-                            Some(glutin::VirtualKeyCode::LControl) => game_object.scale(-utils::get_one_vector() / 10.0),
-                            Some(glutin::VirtualKeyCode::A) => game_object.rotate(utils::get_forward_vector()),
-                            Some(glutin::VirtualKeyCode::D) => game_object.rotate(-utils::get_forward_vector()),
-                            Some(glutin::VirtualKeyCode::LShift) => game_object.translate(-utils::get_forward_vector()),
-                            Some(glutin::VirtualKeyCode::RShift) => game_object.translate(utils::get_forward_vector()),
+                	glutin::WindowEvent::KeyboardInput { input, .. } => match input.state {
+                        glutin::ElementState::Pressed => match input.virtual_keycode {
+                            Some(key) => game_input.set_key(key, true),                 
                 		    _ => ()
                         },
-                        _ => ()
-                	},*/
+                        glutin::ElementState::Released => match input.virtual_keycode {                 
+                            Some(key) => game_input.set_key(key, false),
+                		    _ => ()
+                        }
+                	},
                 	_ => ()
                 },
                 _ => ()

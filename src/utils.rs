@@ -32,7 +32,7 @@ pub fn get_identity_matrix() -> nalgebra::Matrix4<f32> {
 	nalgebra::Matrix4::new(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
 }
 
-/*pub fn get_forward_vector() -> nalgebra::Vector3<f32> {
+pub fn get_forward_vector() -> nalgebra::Vector3<f32> {
 	nalgebra::Vector3::new(0.0, 0.0, 1.0)
 }
 
@@ -44,6 +44,6 @@ pub fn get_right_vector() -> nalgebra::Vector3<f32> {
 	nalgebra::Vector3::new(1.0, 0.0, 0.0)
 }
 
-pub fn get_one_vector() -> nalgebra::Vector3<f32> {
+/*pub fn get_one_vector() -> nalgebra::Vector3<f32> {
 	nalgebra::Vector3::new(1.0, 1.0, 1.0)
 }*/
