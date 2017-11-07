@@ -34,13 +34,13 @@ impl World {
 	}
 
 	pub fn get_block<'a>(&self, blocks: &'a Blocks, x: u32, y: u8, z: u32) -> &'a Block {
-		blocks.block_map.get(&self.get_block_id(x, y, z)).unwrap()
+		blocks.get_block(self.get_block_id(x, y, z))
 	}
 
 	pub fn set_block(&mut self, x: u32, y: u8, z: u32, block: &Block) {
 		self.set_block_ignore_neighbors(x, y, z, block.id);
 
-		for block_pos in &mut self.get_neighbors(x as i64, y as i16, z as i64) {
+		for block_pos in &mut self.get_facial_neighbors(x as i64, y as i16, z as i64) {
 			if block_pos.block_id != 0 {
 				self.set_block_ignore_neighbors(block_pos.x, block_pos.y, block_pos.z, block_pos.block_id);
 			}
@@ -59,7 +59,7 @@ impl World {
 		self.chunks[(x >> 4) as usize][(z >> 4) as usize].blocks[ux][uz][uy] = block;
 
 		if block != 0 {
-			for block_pos in &mut self.get_neighbors(x as i64, y as i16, z as i64) {
+			for block_pos in &mut self.get_facial_neighbors(x as i64, y as i16, z as i64) {
 				if block_pos.block_id == 0 {
 					self.chunks[(x >> 4) as usize][(z >> 4) as usize].visible_blocks.insert(BlockPos::new(x as u32, y, z as u32, block));
 					return;
@@ -80,6 +80,19 @@ impl World {
 		} else {
 			vec.push(BlockPos::new(0, 0, 0, 0));
 		}
+	}
+
+	pub fn get_facial_neighbors(&mut self, x: i64, y: i16, z: i64) -> Vec<BlockPos> {
+		let mut neighbors = Vec::new();
+
+		self.add_if_in_bounds(&mut neighbors, x, y + 1, z);
+		self.add_if_in_bounds(&mut neighbors, x, y - 1, z);
+		self.add_if_in_bounds(&mut neighbors, x + 1, y, z);
+		self.add_if_in_bounds(&mut neighbors, x - 1, y, z);
+		self.add_if_in_bounds(&mut neighbors, x, y, z + 1);
+		self.add_if_in_bounds(&mut neighbors, x, y, z - 1);
+
+		neighbors
 	}
 
 	pub fn get_neighbors(&mut self, x: i64, y: i16, z: i64) -> Vec<BlockPos> {
@@ -204,25 +217,28 @@ impl Block {
 	}
 }
 
-use std::collections::HashMap;
 pub struct Blocks {
-	pub block_map: HashMap<u8, Block>
+	pub block_map: Vec<Block>
 }
 
 impl Blocks {
 	pub fn new() -> Blocks {
 		Blocks {
-			block_map: HashMap::new()
+			block_map: Vec::new()
 		}
 	}
 
 	pub fn initialize(&mut self, display: &mut glium::Display) {
-		self.block_map.insert(0, Block::new(display, "models/stone.png", 0));
-		self.block_map.insert(1, Block::new(display, "models/stone.png", 1));
+		self.block_map.push(Block::new(display, "models/stone.png", 0));
+		self.block_map.push(Block::new(display, "models/stone.png", 1));
 	}
 
 	pub fn get_block(&self, id: u8) -> &Block {
-		self.block_map.get(&id).unwrap()
+		self.block_map.get(id as usize).unwrap()
+	}
+
+	pub fn get_block_count(&self) -> u8 {
+		self.block_map.len() as u8
 	}
 }
 

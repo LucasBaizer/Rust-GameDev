@@ -46,6 +46,9 @@ fn main() {
             }
         }
     }
+    for z in 0..16 {
+        game.world.set_block(2, 2, z, blocks.get_block(0));
+    }
 
     let screen_size = display.get_framebuffer_dimensions();
 
@@ -58,10 +61,14 @@ fn main() {
 	let fragment_shader_src = utils::file_to_string("shaders/fragment.glsl");
 
 	let program = glium::Program::from_source(&display, &vertex_shader_src, &fragment_shader_src, None).unwrap();
-    //.let mut block_angles: f32 = 0.0;
     let projection_matrix: [[f32; 4]; 4] = camera.create_projection_matrix(screen_size).into();
     let vertex_buffer = &game::Block::get_vertex_buffer(&mut display);
     let index_buffer = &game::Block::get_index_buffer(&mut display);
+    let mut samplers = Vec::with_capacity(blocks.get_block_count() as usize);
+
+    for block in &blocks.block_map {
+        samplers.push(block.texture.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest));
+    }
 
     while !closed {
         let start = Instant::now();
@@ -88,8 +95,7 @@ fn main() {
                         translation_matrix[(2, 3)] = block_world_z as f32;
 
                         let transform_matrix: [[f32; 4]; 4] = translation_matrix.into();
-                        let texture_2d = &block.texture;
-                        target.draw(vertex_buffer, index_buffer, &program, &uniform! { sampler: texture_2d.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest), transform: transform_matrix, view_matrix: view_matrix, projection_matrix: projection_matrix }, params).unwrap();
+                        target.draw(vertex_buffer, index_buffer, &program, &uniform! { sampler: *samplers.get(block.id as usize).unwrap(), transform: transform_matrix, view_matrix: view_matrix, projection_matrix: projection_matrix }, params).unwrap();
                     }
                 }
             }
