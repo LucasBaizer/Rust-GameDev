@@ -229,8 +229,8 @@ impl Blocks {
 	}
 
 	pub fn initialize(&mut self, display: &mut glium::Display) {
-		self.block_map.push(Block::new(display, "models/stone.png", 0));
-		self.block_map.push(Block::new(display, "models/stone.png", 1));
+		self.block_map.push(Block::new(display, "textures/blocks/cobblestone.png", 0));
+		self.block_map.push(Block::new(display, "textures/blocks/cobblestone.png", 1));
 	}
 
 	pub fn get_block(&self, id: u8) -> &Block {
