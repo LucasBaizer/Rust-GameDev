@@ -2,13 +2,18 @@
 extern crate glium;
 extern crate image;
 extern crate nalgebra;
-extern crate obj;
 
 mod camera;
 mod object;
 mod utils;
 mod game;
 mod input;
+
+#[derive(Clone, Copy)]
+pub struct Instance {
+    pub matrix: [[f32; 4]; 4],
+    pub id: u8
+}
 
 fn main() {
     use glium::{glutin, Surface};
@@ -22,7 +27,7 @@ fn main() {
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let window = glium::glutin::WindowBuilder::new().with_title("Rust Minecraft");
-    let context = glium::glutin::ContextBuilder::new().with_depth_buffer(24);;
+    let context = glium::glutin::ContextBuilder::new().with_depth_buffer(24);
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
 
     let params = &glium::DrawParameters {
@@ -31,11 +36,12 @@ fn main() {
             write: true,
             .. Default::default()
         },
+        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
         .. Default::default()
     };
 
     let mut blocks: game::Blocks = game::Blocks::new();
-    blocks.initialize(&mut display);
+    blocks.initialize();
 
     let mut game: game::Game = game::Game::new(0, 2);
 
@@ -56,6 +62,7 @@ fn main() {
 
     use game::Vertex;
 	implement_vertex!(Vertex, position, uv);
+    implement_vertex!(Instance, matrix, id);
 
 	let vertex_shader_src = utils::file_to_string("shaders/vertex.glsl");
 	let fragment_shader_src = utils::file_to_string("shaders/fragment.glsl");
@@ -63,12 +70,10 @@ fn main() {
 	let program = glium::Program::from_source(&display, &vertex_shader_src, &fragment_shader_src, None).unwrap();
     let projection_matrix: [[f32; 4]; 4] = camera.create_projection_matrix(screen_size).into();
     let vertex_buffer = &game::Block::get_vertex_buffer(&mut display);
+    let instance_buffer = &game.world.get_instance_buffer(&mut display);
     let index_buffer = &game::Block::get_index_buffer(&mut display);
-    let mut samplers = Vec::with_capacity(blocks.get_block_count() as usize);
-
-    for block in &blocks.block_map {
-        samplers.push(block.texture.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest));
-    }
+    let sampler_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/blocks/atlas.png")).unwrap();
+    let sampler = sampler_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
 
     while !closed {
         let start = Instant::now();
@@ -77,9 +82,9 @@ fn main() {
         target.clear_color_and_depth((1.0, 1.0, 1.0, 1.0), 1.0);
 
         let view_matrix: [[f32; 4]; 4] = camera.get_view_matrix().try_inverse().unwrap().into();
-        let mut translation_matrix: nalgebra::Matrix4<f32> = utils::get_identity_matrix();
+        //let mut translation_matrix: nalgebra::Matrix4<f32> = utils::get_identity_matrix();
 
-        for chunk_x in 0..game.world.chunks.len() {
+        /*for chunk_x in 0..game.world.chunks.len() {
             for chunk_z in 0..game.world.chunks[chunk_x].len() {
                 let chunk = game.world.get_chunk(chunk_x, chunk_z);
                 let visible_blocks = chunk.visible_blocks.iter();
@@ -95,12 +100,12 @@ fn main() {
                         translation_matrix[(2, 3)] = block_world_z as f32;
 
                         let transform_matrix: [[f32; 4]; 4] = translation_matrix.into();
-                        target.draw(vertex_buffer, index_buffer, &program, &uniform! { sampler: *samplers.get(block.id as usize).unwrap(), transform: transform_matrix, view_matrix: view_matrix, projection_matrix: projection_matrix }, params).unwrap();
+                        target.draw(vertex_buffer, instance_buffer.per_instance().unwrap(), index_buffer, &program, &uniform! { sampler: *samplers.get(block.id as usize).unwrap(), transform: transform_matrix, view_matrix: view_matrix, projection_matrix: projection_matrix }, params).unwrap();
                     }
                 }
             }
-        }
-
+        }*/
+        target.draw((vertex_buffer, instance_buffer.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, view_matrix: view_matrix, projection_matrix: projection_matrix }, params).unwrap();
         target.finish().unwrap();
 
         let ms = start.elapsed().as_secs() * 1000;

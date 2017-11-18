@@ -16,6 +16,7 @@ pub struct World {
 	pub chunks: Vec<Vec<Chunk>>
 }
 
+use Instance;
 impl World {
 	pub fn get_chunk(&self, x: usize, y: usize) -> &Chunk {
 		&self.chunks[x][y]
@@ -23,14 +24,6 @@ impl World {
 
 	pub fn get_block_id(&self, x: u32, y: u8, z: u32) -> u8 {
 		self.chunks[(x >> 4) as usize][(z >> 4) as usize].blocks[(x & 15) as usize][(z & 15) as usize][y as usize]
-	}
-
-	pub fn get_block_at_pos<'a>(&self, blocks: &'a Blocks, pos: &BlockPos) -> &'a Block {
-		self.get_block(blocks, pos.x, pos.y, pos.z)
-	}
-
-	pub fn get_block_id_at_pos(&self, pos: &BlockPos) -> u8 {
-		self.get_block_id(pos.x, pos.y, pos.z)
 	}
 
 	pub fn get_block<'a>(&self, blocks: &'a Blocks, x: u32, y: u8, z: u32) -> &'a Block {
@@ -45,6 +38,28 @@ impl World {
 				self.set_block_ignore_neighbors(block_pos.x, block_pos.y, block_pos.z, block_pos.block_id);
 			}
 		}
+	}
+
+	pub fn get_instance_buffer(&mut self, display: &mut glium::Display) -> glium::VertexBuffer<Instance> {
+		let mut vec = Vec::new();
+
+		for chunk_x in 0..self.chunks.len() {
+            for chunk_z in 0..self.chunks[chunk_x].len() {
+            	for block in &self.chunks[chunk_x][chunk_z].visible_blocks {
+            		let mut mat = utils::get_identity_matrix();
+            		mat[(0, 3)] = block.x as f32;
+					mat[(1, 3)] = block.y as f32;
+					mat[(2, 3)] = block.z as f32;
+
+            		vec.push(Instance {
+            			matrix: mat.into(),
+            			id: block.block_id
+            		});
+            	}
+            }
+        }
+
+        glium::VertexBuffer::new(display, &vec).unwrap()
 	}
 
 	fn set_block_ignore_neighbors(&mut self, x: u32, raw_y: u8, z: u32, block: u8) {
@@ -94,39 +109,6 @@ impl World {
 
 		neighbors
 	}
-
-	pub fn get_neighbors(&mut self, x: i64, y: i16, z: i64) -> Vec<BlockPos> {
-		let mut neighbors = Vec::new();
-
-		self.add_if_in_bounds(&mut neighbors, x - 1, y, z);
-		self.add_if_in_bounds(&mut neighbors, x - 1, y - 1, z);
-		self.add_if_in_bounds(&mut neighbors, x - 1, y - 1, z + 1);
-		self.add_if_in_bounds(&mut neighbors, x - 1, y - 1, z - 1);
-		self.add_if_in_bounds(&mut neighbors, x - 1, y + 1, z);
-		self.add_if_in_bounds(&mut neighbors, x - 1, y + 1, z + 1);
-		self.add_if_in_bounds(&mut neighbors, x - 1, y + 1, z - 1);
-		self.add_if_in_bounds(&mut neighbors, x - 1, y, z - 1);
-		self.add_if_in_bounds(&mut neighbors, x - 1, y, z + 1);
-		self.add_if_in_bounds(&mut neighbors, x, y - 1, z);
-		self.add_if_in_bounds(&mut neighbors, x, y, z - 1);
-		self.add_if_in_bounds(&mut neighbors, x, y - 1, z - 1);
-		self.add_if_in_bounds(&mut neighbors, x, y - 1, z + 1);
-		self.add_if_in_bounds(&mut neighbors, x, y + 1, z);
-		self.add_if_in_bounds(&mut neighbors, x, y, z + 1);
-		self.add_if_in_bounds(&mut neighbors, x, y + 1, z + 1);
-		self.add_if_in_bounds(&mut neighbors, x, y + 1, z - 1);
-		self.add_if_in_bounds(&mut neighbors, x + 1, y, z);
-		self.add_if_in_bounds(&mut neighbors, x + 1, y - 1, z);
-		self.add_if_in_bounds(&mut neighbors, x + 1, y - 1, z - 1);
-		self.add_if_in_bounds(&mut neighbors, x + 1, y - 1, z + 1);
-		self.add_if_in_bounds(&mut neighbors, x + 1, y, z - 1);
-		self.add_if_in_bounds(&mut neighbors, x + 1, y + 1, z);
-		self.add_if_in_bounds(&mut neighbors, x + 1, y + 1, z + 1);
-		self.add_if_in_bounds(&mut neighbors, x + 1, y + 1, z - 1);
-		self.add_if_in_bounds(&mut neighbors, x + 1, y, z + 1);
-
-		neighbors
-	}
 }
 
 #[derive(Hash, Debug)]
@@ -166,15 +148,13 @@ use glium;
 
 pub struct Block {
 	pub id: u8,
-	pub texture: glium::texture::Texture2d
 }
 
 use utils;
 
 impl Block {
-	pub fn new(display: &mut glium::Display, img: &str, id: u8) -> Block {
+	pub fn new(id: u8) -> Block {
 		Block {
-			texture: glium::texture::Texture2d::new(display, utils::load_image_from_file(img)).unwrap(),
 			id: id
 		}
 	}
@@ -228,9 +208,9 @@ impl Blocks {
 		}
 	}
 
-	pub fn initialize(&mut self, display: &mut glium::Display) {
-		self.block_map.push(Block::new(display, "textures/blocks/cobblestone.png", 0));
-		self.block_map.push(Block::new(display, "textures/blocks/cobblestone.png", 1));
+	pub fn initialize(&mut self) {
+		self.block_map.push(Block::new(0));
+		self.block_map.push(Block::new(1));
 	}
 
 	pub fn get_block(&self, id: u8) -> &Block {
