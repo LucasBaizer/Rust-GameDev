@@ -62,27 +62,27 @@ impl World {
         glium::VertexBuffer::new(display, &vec).unwrap()
 	}
 
-	fn set_block_ignore_neighbors(&mut self, x: u32, raw_y: u8, z: u32, block: u8) {
-		let x = (x & 15) as u8;
+	fn set_block_ignore_neighbors(&mut self, raw_x: u32, raw_y: u8, raw_z: u32, block: u8) {
+		let x = (raw_x & 15) as u8;
 		let y = raw_y as u8;
-		let z = (z & 15) as u8;
+		let z = (raw_z & 15) as u8;
 
 		let ux = x as usize;
 		let uy = y as usize;
 		let uz = z as usize;
 
-		self.chunks[(x >> 4) as usize][(z >> 4) as usize].blocks[ux][uz][uy] = block;
+		self.chunks[(raw_x >> 4) as usize][(raw_z >> 4) as usize].blocks[ux][uz][uy] = block;
 
 		if block != 0 {
-			for block_pos in &mut self.get_facial_neighbors(x as i64, y as i16, z as i64) {
+			for block_pos in &mut self.get_facial_neighbors(raw_x as i64, y as i16, raw_z as i64) {
 				if block_pos.block_id == 0 {
-					self.chunks[(x >> 4) as usize][(z >> 4) as usize].visible_blocks.insert(BlockPos::new(x as u32, y, z as u32, block));
+					self.chunks[(raw_x >> 4) as usize][(raw_z >> 4) as usize].visible_blocks.insert(BlockPos::new(raw_x as u32, y, raw_z as u32, block));
 					return;
 				}
 			}
 		}
 
-		self.chunks[(x >> 4) as usize][(z >> 4) as usize].visible_blocks.remove(&BlockPos::new(x as u32, y, z as u32, block));
+		self.chunks[(raw_x >> 4) as usize][(raw_z >> 4) as usize].visible_blocks.remove(&BlockPos::new(raw_x as u32, y, raw_z as u32, block));
 	}
 	
 	pub fn is_in_world_bounds(&self, x: i64, y: i16, z: i64) -> bool {
@@ -111,7 +111,7 @@ impl World {
 	}
 }
 
-#[derive(Hash, Debug)]
+#[derive(Debug)]
 pub struct BlockPos {
 	pub x: u32,
 	pub y: u8,
@@ -132,7 +132,16 @@ impl BlockPos {
 
 impl PartialEq for BlockPos {
 	fn eq(&self, other: &BlockPos) -> bool {
-        self.x == other.x && self.y == other.y && self.z == other.z && self.block_id == other.block_id
+        self.x == other.x && self.y == other.y && self.z == other.z
+    }
+}
+
+use std::hash::{Hash, Hasher};
+impl Hash for BlockPos {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.x.hash(state);
+        self.y.hash(state);
+        self.z.hash(state);
     }
 }
 

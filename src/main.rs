@@ -82,29 +82,7 @@ fn main() {
         target.clear_color_and_depth((1.0, 1.0, 1.0, 1.0), 1.0);
 
         let view_matrix: [[f32; 4]; 4] = camera.get_view_matrix().try_inverse().unwrap().into();
-        //let mut translation_matrix: nalgebra::Matrix4<f32> = utils::get_identity_matrix();
 
-        /*for chunk_x in 0..game.world.chunks.len() {
-            for chunk_z in 0..game.world.chunks[chunk_x].len() {
-                let chunk = game.world.get_chunk(chunk_x, chunk_z);
-                let visible_blocks = chunk.visible_blocks.iter();
-
-                for block_pos in visible_blocks {
-                    let block_world_x = (chunk_x * 16) + block_pos.x as usize;
-                    let block_world_z = (chunk_z * 16) + block_pos.z as usize;
-                    let block: &game::Block = game.world.get_block(&blocks, block_world_x as u32, block_pos.y, block_world_z as u32);
-
-                    if block.id > 0 {
-                        translation_matrix[(0, 3)] = block_world_x as f32;
-                        translation_matrix[(1, 3)] = block_pos.y as f32;
-                        translation_matrix[(2, 3)] = block_world_z as f32;
-
-                        let transform_matrix: [[f32; 4]; 4] = translation_matrix.into();
-                        target.draw(vertex_buffer, instance_buffer.per_instance().unwrap(), index_buffer, &program, &uniform! { sampler: *samplers.get(block.id as usize).unwrap(), transform: transform_matrix, view_matrix: view_matrix, projection_matrix: projection_matrix }, params).unwrap();
-                    }
-                }
-            }
-        }*/
         target.draw((vertex_buffer, instance_buffer.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, view_matrix: view_matrix, projection_matrix: projection_matrix }, params).unwrap();
         target.finish().unwrap();
 
