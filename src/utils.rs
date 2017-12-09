@@ -44,6 +44,10 @@ pub fn get_right_vector() -> nalgebra::Vector3<f32> {
 	nalgebra::Vector3::new(1.0, 0.0, 0.0)
 }
 
+pub fn clamp(val: f32, min: f32, max: f32) -> f32 {
+	f32::max(min, f32::min(max, val))
+}
+
 /*pub fn get_one_vector() -> nalgebra::Vector3<f32> {
 	nalgebra::Vector3::new(1.0, 1.0, 1.0)
 }*/

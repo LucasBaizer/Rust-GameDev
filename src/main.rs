@@ -2,6 +2,7 @@
 extern crate glium;
 extern crate image;
 extern crate nalgebra;
+extern crate alga;
 
 mod camera;
 mod object;
@@ -29,6 +30,8 @@ fn main() {
     let window = glium::glutin::WindowBuilder::new().with_title("Rust Minecraft");
     let context = glium::glutin::ContextBuilder::new().with_depth_buffer(24);
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
+
+    display.gl_window().window().set_cursor_state(glium::glutin::CursorState::Hide).unwrap();
 
     let params = &glium::DrawParameters {
         depth: glium::Depth {
@@ -75,6 +78,8 @@ fn main() {
     let sampler_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/blocks/atlas.png")).unwrap();
     let sampler = sampler_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
 
+    let mut dx : f32 = 0.0;
+    let mut dy : f32 = 0.0;
     while !closed {
         let start = Instant::now();
 
@@ -92,21 +97,29 @@ fn main() {
         }
 
         if game_input.get_key(VirtualKeyCode::W) {
-            camera.translate(utils::get_forward_vector() / 32.0);
+            let forward = camera.forward();
+            camera.translate(forward / 32.0);
         } else if game_input.get_key(VirtualKeyCode::S) {
-            camera.translate(-utils::get_forward_vector() / 32.0);
+            let forward = camera.forward();
+            camera.translate(-forward / 32.0);
         }
 
         if game_input.get_key(VirtualKeyCode::A) {
-            camera.translate(-utils::get_right_vector() / 32.0);
+            let right = camera.right();
+            camera.translate(-right / 32.0);
         } else if game_input.get_key(VirtualKeyCode::D) {
-            camera.translate(utils::get_right_vector() / 32.0);
+            let right = camera.right();
+            camera.translate(right / 32.0);
         }
 
         if game_input.get_key(VirtualKeyCode::Space) {
             camera.translate(utils::get_up_vector() / 32.0);
         } else if game_input.get_key(VirtualKeyCode::LControl) {
             camera.translate(-utils::get_up_vector() / 32.0);
+        }
+
+        if game_input.get_key(VirtualKeyCode::Escape) {
+            return;
         }
 
         events_loop.poll_events(|ev| {
@@ -123,10 +136,20 @@ fn main() {
                 		    _ => ()
                         }
                 	},
+                    glutin::WindowEvent::MouseMoved{position, ..} => {
+                       dx = (screen_size.0 / 2) as f32 - position.0 as f32;
+                       dy = (screen_size.1 / 2) as f32 - position.1 as f32;
+                       camera.rot_x += dx / 10.0 / (180.0 / std::f32::consts::PI);
+                       camera.rot_y = utils::clamp(camera.rot_y, -(3.14 / 2.0), 3.14 / 2.0);
+
+                       camera.rot_y += dy / 10.0 / (180.0 / std::f32::consts::PI);
+                   },
                 	_ => ()
                 },
                 _ => ()
             }
         });
+
+        display.gl_window().window().set_cursor_position(screen_size.0 as i32 / 2, screen_size.1 as i32 / 2).unwrap();
     }
 }

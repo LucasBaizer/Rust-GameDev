@@ -7,3 +7,4 @@ authors = ["Lucas Baizer"]
 glium = "0.17.1"
 image = "*"
 nalgebra = "*"
+alga = "*"
