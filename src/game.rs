@@ -220,6 +220,7 @@ impl Blocks {
 	pub fn initialize(&mut self) {
 		self.block_map.push(Block::new(0));
 		self.block_map.push(Block::new(1));
+		self.block_map.push(Block::new(2));
 	}
 
 	pub fn get_block(&self, id: u8) -> &Block {
