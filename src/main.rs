@@ -61,6 +61,9 @@ fn main() {
                 if height - y <= 4 {
                     block = 2;
                 }
+                if height - 1 == y {
+                    block = 3;
+                }
                 game.world.set_block(x, y, z, blocks.get_block(block));
             }
         }
@@ -71,7 +74,7 @@ fn main() {
     let mut closed = false;
 
     use game::Vertex;
-	implement_vertex!(Vertex, position, uv);
+	implement_vertex!(Vertex, position, uv, face);
     implement_vertex!(Instance, matrix, id);
 
 	let vertex_shader_src = utils::file_to_string("shaders/vertex.glsl");

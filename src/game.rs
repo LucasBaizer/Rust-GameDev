@@ -162,37 +162,42 @@ pub struct Block {
 use utils;
 
 impl Block {
-	pub fn new(id: u8) -> Block {
+	pub fn new(id: BlockType) -> Block {
 		Block {
-			id: id
+			id: id as u8
 		}
 	}
 
 	pub fn get_vertex_buffer(display: &mut glium::Display) -> glium::VertexBuffer<Vertex> {
-		let mut vertices = vec![Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 1.0] }, //0
-								Vertex { position: [0.5, -0.5, 0.5], uv: [1.0, 1.0] }, //1
-								Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0] }, //2
-								Vertex { position: [0.5, 0.5, 0.5], uv: [1.0, 0.0] }, //3
-								Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0] }, //4
-								Vertex { position: [0.5, 0.5, 0.5], uv: [1.0, 0.0] }, //5
-								Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 1.0] }, //6
-								Vertex { position: [0.5, 0.5, -0.5], uv: [1.0, 1.0] }, //7
-								Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 0.0] }, //8
-								Vertex { position: [0.5, 0.5, -0.5], uv: [1.0, 0.0] }, //9
-								Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 1.0] }, //10
-								Vertex { position: [0.5, -0.5, -0.5], uv: [1.0, 1.0] }, //11
-								Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 1.0] }, //12
-								Vertex { position: [0.5, -0.5, -0.5], uv: [1.0, 1.0] }, //13
-								Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 0.0] }, //14
-								Vertex { position: [0.5, -0.5, 0.5], uv: [0.0, 1.0] }, //15
-								Vertex { position: [0.5, -0.5, 0.5], uv: [0.0, 1.0] }, //16
-								Vertex { position: [0.5, -0.5, -0.5], uv: [1.0, 1.0] }, //17
-								Vertex { position: [0.5, 0.5, 0.5], uv: [0.0, 0.0] }, //18
-								Vertex { position: [0.5, 0.5, -0.5], uv: [1.0, 0.0] }, //19
-								Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 1.0] }, //20
-								Vertex { position: [-0.5, -0.5, 0.5], uv: [1.0, 1.0] }, //21
-								Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 0.0] }, //22		
-								Vertex { position: [-0.5, 0.5, 0.5], uv: [1.0, 0.0] } //23
+		let mut vertices = vec![Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 1.0], face: 0 }, //0 back
+								Vertex { position: [0.5, -0.5, 0.5], uv: [1.0, 1.0], face: 0 }, //1
+								Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0], face: 0 }, //2
+								Vertex { position: [0.5, 0.5, 0.5], uv: [1.0, 0.0], face: 0 }, //3
+
+								Vertex { position: [-0.5, 0.5, 0.5], uv: [0.0, 0.0], face: 1 }, //4 top
+								Vertex { position: [0.5, 0.5, 0.5], uv: [1.0, 0.0], face: 1 }, //5
+								Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 1.0], face: 1 }, //6
+								Vertex { position: [0.5, 0.5, -0.5], uv: [1.0, 1.0] , face: 1 }, //7
+
+								Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 0.0], face: 2 }, //8 front
+								Vertex { position: [0.5, 0.5, -0.5], uv: [1.0, 0.0], face: 2 }, //9
+								Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 1.0], face: 2 }, //10
+								Vertex { position: [0.5, -0.5, -0.5], uv: [1.0, 1.0], face: 2 }, //11
+
+								Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 1.0], face: 3 }, //12 bottom
+								Vertex { position: [0.5, -0.5, -0.5], uv: [1.0, 1.0], face: 3 }, //13
+								Vertex { position: [-0.5, -0.5, 0.5], uv: [0.0, 0.0], face: 3 }, //14
+								Vertex { position: [0.5, -0.5, 0.5], uv: [0.0, 1.0], face: 3 }, //15
+
+								Vertex { position: [0.5, -0.5, 0.5], uv: [0.0, 1.0], face: 4}, //16 right
+								Vertex { position: [0.5, -0.5, -0.5], uv: [1.0, 1.0], face: 4 }, //17
+								Vertex { position: [0.5, 0.5, 0.5], uv: [0.0, 0.0], face: 4 }, //18
+								Vertex { position: [0.5, 0.5, -0.5], uv: [1.0, 0.0], face: 4 }, //19
+
+								Vertex { position: [-0.5, -0.5, -0.5], uv: [0.0, 1.0], face: 5 }, //20 left
+								Vertex { position: [-0.5, -0.5, 0.5], uv: [1.0, 1.0], face: 5 }, //21
+								Vertex { position: [-0.5, 0.5, -0.5], uv: [0.0, 0.0], face: 5 }, //22		
+								Vertex { position: [-0.5, 0.5, 0.5], uv: [1.0, 0.0], face: 5 } //23
 								];
 		for v in &mut vertices {
 			v.uv[1] = 1.0 - v.uv[1];
@@ -202,8 +207,16 @@ impl Block {
 
 	pub fn get_index_buffer(display: &mut glium::Display) -> glium::IndexBuffer<u16> {
 		let indices = vec![0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7, 8, 9, 10, 10, 9, 11, 12, 13, 14, 14, 13, 15, 16, 17, 18, 18, 17, 19, 20, 21, 22, 22, 21, 23];
+		//let indices = vec![12, 13, 14, 14, 13, 15];
 		glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap()
 	}
+}
+
+pub enum BlockType {
+	Air = 0,
+	Cobblestone = 1,
+	Dirt = 2,
+	Grass = 3
 }
 
 pub struct Blocks {
@@ -218,9 +231,10 @@ impl Blocks {
 	}
 
 	pub fn initialize(&mut self) {
-		self.block_map.push(Block::new(0));
-		self.block_map.push(Block::new(1));
-		self.block_map.push(Block::new(2));
+		self.block_map.push(Block::new(BlockType::Air));
+		self.block_map.push(Block::new(BlockType::Cobblestone));
+		self.block_map.push(Block::new(BlockType::Dirt));
+		self.block_map.push(Block::new(BlockType::Grass));
 	}
 
 	pub fn get_block(&self, id: u8) -> &Block {
@@ -270,6 +284,7 @@ fn create_chunk(air_block: u8) -> Chunk {
 pub struct Vertex {
     pub position: [f32; 3],
     pub uv: [f32; 2],
+    pub face: u8
 }
 
 /*impl Vertex {
