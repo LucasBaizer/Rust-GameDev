@@ -52,9 +52,9 @@ fn main() {
 
     let blocks_count: f32 = blocks.block_map.len() as f32 - 1.0;
 
-    let mut game: game::Game = game::Game::new(0, 2);
-    for x in 0..31 {
-        for z in 0..31 {
+    let mut game: game::Game = game::Game::new(0, 16);
+    for x in 0..255 {
+        for z in 0..255 {
             let height: u8 = 64 + ((perlin.get([x as f32 / 10.0 + 0.5, z as f32 / 10.0 + 0.5])) * 4.0) as u8;
             for y in 0..height {
                 let mut block = 1;
@@ -85,13 +85,17 @@ fn main() {
     let vertex_buffer = &game::Block::get_vertex_buffer(&mut display);
     let instance_buffer = &game.world.get_instance_buffer(&mut display);
     let index_buffer = &game::Block::get_index_buffer(&mut display);
-    let sampler_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/blocks/atlas.png")).unwrap();
+    //let sampler_raw = glium::texture::Texture2d::with_mipmaps(&mut display, utils::load_image_from_file("textures/blocks/atlas_old.png"), glium::texture::MipmapsOption::NoMipmap).unwrap();
+    let sampler_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/blocks/atlas_old.png")).unwrap();
     let sampler = sampler_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
 
-    camera.translate(utils::get_up_vector() * 64.0);
+    camera.translate(utils::get_up_vector() * 72.0);
+    camera.translate(utils::get_right_vector() * 4.0);
+    camera.translate(utils::get_forward_vector() * 4.0);
 
-    let mut dx : f32 = 0.0;
-    let mut dy : f32 = 0.0;
+    let mut gravity_velocity: f32 = 0.0;
+    let mut dx: f32 = 0.0;
+    let mut dy: f32 = 0.0;
     while !closed {
         let start = Instant::now();
 
@@ -107,6 +111,12 @@ fn main() {
         if ms < 10 {
             thread::sleep(Duration::from_millis(10 - ms));
         }
+
+        let old_pos = camera.position;
+        let corner_positions = get_player_bounds(camera.position);
+
+        camera.translate(-utils::get_up_vector() * gravity_velocity);
+        gravity_velocity += 0.001;
 
         if game_input.get_key(VirtualKeyCode::W) {
             let forward = camera.forward();
@@ -132,6 +142,15 @@ fn main() {
 
         if game_input.get_key(VirtualKeyCode::Escape) {
             return;
+        }
+
+        if game.world.is_in_rendered_world_bounds(game.render_distance, old_pos.x as i64, old_pos.y as i16, old_pos.z as i64) {
+            let mut new_position = camera.position;
+            for i in 0..8 {
+                let o = &mut corner_positions[i].clone();
+                gravity_velocity = constrain_camera(&game.world, o, &mut new_position, gravity_velocity);
+                camera.position = nalgebra::Vector3::new(new_position.x, new_position.y, new_position.z);
+            }
         }
 
         events_loop.poll_events(|ev| {
@@ -164,4 +183,35 @@ fn main() {
 
         display.gl_window().window().set_cursor_position(screen_size.0 as i32 / 2, screen_size.1 as i32 / 2).unwrap();
     }
+}
+
+fn get_player_bounds(pos: nalgebra::Vector3<f32>) -> [nalgebra::Vector3<f32>; 8] {
+    [
+        nalgebra::Vector3::new(pos.x - 0.5, pos.y - 2.0, pos.z - 0.5),
+        nalgebra::Vector3::new(pos.x - 0.5, pos.y - 2.0, pos.z + 0.5),
+        nalgebra::Vector3::new(pos.x + 0.5, pos.y - 2.0, pos.z - 0.5),
+        nalgebra::Vector3::new(pos.x + 0.5, pos.y - 2.0, pos.z + 0.5),
+        nalgebra::Vector3::new(pos.x - 0.5, pos.y, pos.z - 0.5),
+        nalgebra::Vector3::new(pos.x - 0.5, pos.y, pos.z + 0.5),
+        nalgebra::Vector3::new(pos.x + 0.5, pos.y, pos.z - 0.5),
+        nalgebra::Vector3::new(pos.x + 0.5, pos.y, pos.z + 0.5)
+    ]
+}
+
+fn constrain_camera(world: &game::World, old_pos: &mut nalgebra::Vector3<f32>, new_pos: &mut nalgebra::Vector3<f32>, gravity_velocity: f32) -> f32 {
+    let test_x = (new_pos.x, old_pos.y, old_pos.z);
+    if world.is_solid_block(test_x.0, test_x.1, test_x.2) {
+        new_pos.x = old_pos.x;
+    }
+    let test_z = (new_pos.x, old_pos.y, new_pos.z);
+    if world.is_solid_block(test_z.0, test_z.1, test_z.2) {
+        new_pos.z = old_pos.z;
+    }
+    let test_y = (new_pos.x, new_pos.y, new_pos.z);
+    if world.is_solid_block(test_y.0, test_y.1, test_y.2) {
+        new_pos.y = old_pos.y;
+        return 0.0;
+    }
+
+    gravity_velocity
 }

@@ -30,6 +30,10 @@ impl World {
 		blocks.get_block(self.get_block_id(x, y, z))
 	}
 
+	pub fn is_solid_block(&self, x: f32, y: f32, z: f32) -> bool {
+		self.get_block_id((x + 0.5) as u32, (y + 0.5) as u8, (z + 0.5) as u32) > 0
+	}
+
 	pub fn set_block(&mut self, x: u32, y: u8, z: u32, block: &Block) {
 		self.set_block_ignore_neighbors(x, y, z, block.id);
 
@@ -87,6 +91,10 @@ impl World {
 	
 	pub fn is_in_world_bounds(&self, x: i64, y: i16, z: i64) -> bool {
 		x >= 0 && z >= 0 && y >= 0 && y <= 255
+	}
+
+	pub fn is_in_rendered_world_bounds(&self, render_distance: u8, x: i64, y: i16, z: i64) -> bool {
+		x >= 0 && z >= 0 && y >= 0 && y <= 255 && x + 1 < render_distance as i64 * 16 && z + 1 < render_distance as i64 * 16
 	}
 
 	fn add_if_in_bounds(&self, vec: &mut Vec<BlockPos>, x: i64, y: i16, z: i64) {

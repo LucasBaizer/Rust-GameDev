@@ -1,8 +1,8 @@
 use nalgebra;
 
 pub struct Camera {
-	field_of_view: f32,
-	position: nalgebra::Vector3<f32>,
+	pub field_of_view: f32,
+	pub position: nalgebra::Vector3<f32>,
 	pub rot_x: f32,
 	pub rot_y: f32
 }
