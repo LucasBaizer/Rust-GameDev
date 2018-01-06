@@ -18,10 +18,6 @@ pub struct World {
 
 use Instance;
 impl World {
-	pub fn get_chunk(&self, x: usize, y: usize) -> &Chunk {
-		&self.chunks[x][y]
-	}
-
 	pub fn get_block_id(&self, x: u32, y: u8, z: u32) -> u8 {
 		self.chunks[(x >> 4) as usize][(z >> 4) as usize].blocks[(x & 15) as usize][(z & 15) as usize][y as usize]
 	}

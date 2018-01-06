@@ -4,6 +4,7 @@ extern crate image;
 extern crate nalgebra;
 extern crate alga;
 extern crate noise;
+extern crate rand;
 
 mod camera;
 mod object;
@@ -17,6 +18,7 @@ pub struct Instance {
     pub id: u8
 }
 
+use rand::Rng;
 fn main() {
     use glium::{glutin, Surface};
     use glium::glutin::VirtualKeyCode;
@@ -33,7 +35,7 @@ fn main() {
     let context = glium::glutin::ContextBuilder::new().with_depth_buffer(24);
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
     let perlin = Perlin::new();
-    perlin.set_seed(1);
+    perlin.set_seed(rand::thread_rng().gen::<usize>());
 
     display.gl_window().window().set_cursor_state(glium::glutin::CursorState::Hide).unwrap();
 
@@ -44,6 +46,10 @@ fn main() {
             .. Default::default()
         },
         backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+        .. Default::default()
+    };
+
+    let skybox_params = &glium::DrawParameters {
         .. Default::default()
     };
 
@@ -79,8 +85,8 @@ fn main() {
 
 	let vertex_shader_src = utils::file_to_string("shaders/vertex.glsl");
 	let fragment_shader_src = utils::file_to_string("shaders/fragment.glsl");
-
 	let program = glium::Program::from_source(&display, &vertex_shader_src, &fragment_shader_src, None).unwrap();
+
     let projection_matrix: [[f32; 4]; 4] = camera.create_projection_matrix(screen_size).into();
     let vertex_buffer = &game::Block::get_vertex_buffer(&mut display);
     let instance_buffer = &game.world.get_instance_buffer(&mut display);
@@ -88,6 +94,13 @@ fn main() {
     //let sampler_raw = glium::texture::Texture2d::with_mipmaps(&mut display, utils::load_image_from_file("textures/blocks/atlas_old.png"), glium::texture::MipmapsOption::NoMipmap).unwrap();
     let sampler_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/blocks/atlas_old.png")).unwrap();
     let sampler = sampler_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
+
+    let skybox_tex_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/skybox.png")).unwrap();
+    let skybox_vertex_shader_src = utils::file_to_string("shaders/skybox_vertex.glsl");
+	let skybox_fragment_shader_src = utils::file_to_string("shaders/skybox_fragment.glsl");
+    let skybox_program = glium::Program::from_source(&display, &skybox_vertex_shader_src, &skybox_fragment_shader_src, None).unwrap();
+    let skybox = texture_to_cubemap(skybox_tex_raw, &mut display);
+    let skybox_sampled = skybox.sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
 
     camera.translate(utils::get_up_vector() * 72.0);
     camera.translate(utils::get_right_vector() * 4.0);
@@ -104,6 +117,12 @@ fn main() {
 
         let view_matrix: [[f32; 4]; 4] = camera.get_view_matrix().try_inverse().unwrap().into();
 
+        let mut skybox_view_matrix = view_matrix.clone();
+        skybox_view_matrix[3][0] = 0.0;
+        skybox_view_matrix[3][1] = 0.0;
+        skybox_view_matrix[3][2] = 0.0;
+
+        target.draw(vertex_buffer, index_buffer, &skybox_program, &uniform! { view_matrix: skybox_view_matrix, projection_matrix: projection_matrix, cubemap: skybox_sampled }, skybox_params).unwrap();
         target.draw((vertex_buffer, instance_buffer.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, view_matrix: view_matrix, projection_matrix: projection_matrix, total_blocks: blocks_count }, params).unwrap();
         target.finish().unwrap();
 
@@ -116,7 +135,7 @@ fn main() {
         let corner_positions = get_player_bounds(camera.position);
 
         camera.translate(-utils::get_up_vector() * gravity_velocity);
-        gravity_velocity += 0.001;
+        //gravity_velocity += 0.001;
 
         if game_input.get_key(VirtualKeyCode::W) {
             let forward = camera.forward();
@@ -144,14 +163,14 @@ fn main() {
             return;
         }
 
-        if game.world.is_in_rendered_world_bounds(game.render_distance, old_pos.x as i64, old_pos.y as i16, old_pos.z as i64) {
+        /*if game.world.is_in_rendered_world_bounds(game.render_distance, old_pos.x as i64, old_pos.y as i16, old_pos.z as i64) {
             let mut new_position = camera.position;
             for i in 0..8 {
                 let o = &mut corner_positions[i].clone();
                 gravity_velocity = constrain_camera(&game.world, o, &mut new_position, gravity_velocity);
                 camera.position = nalgebra::Vector3::new(new_position.x, new_position.y, new_position.z);
             }
-        }
+        }*/
 
         events_loop.poll_events(|ev| {
             match ev {
@@ -214,4 +233,47 @@ fn constrain_camera(world: &game::World, old_pos: &mut nalgebra::Vector3<f32>, n
     }
 
     gravity_velocity
+}
+
+use glium::texture::cubemap::Cubemap;
+use glium::texture::cubemap::CubemapMipmap;
+use glium::framebuffer::SimpleFrameBuffer;
+use glium::texture::CubeLayer;
+use glium::Rect;
+use glium::BlitTarget;
+use glium::uniforms::MagnifySamplerFilter;
+use glium::Surface;
+use glium::texture::Texture2d;
+fn texture_to_cubemap(tex: Texture2d, display: &mut glium::Display) -> Cubemap {
+    let map = Cubemap::empty(display, 160).unwrap();
+    {
+        let main_level = map.main_level();
+        let to_rect = BlitTarget {
+            left: 0,
+            bottom: 0,
+            width: 160,
+            height: 160
+        };
+
+        fn write_to_cubemap(display: &mut glium::Display, main_level: CubemapMipmap, side: CubeLayer, to_rect: BlitTarget, tex: &Texture2d, left: u32, right: u32) {
+            let buffer = SimpleFrameBuffer::new(display, main_level.image(side)).unwrap();
+
+            tex.as_surface().blit_color(&Rect {
+                left: left,
+                bottom: right,
+                width: 160,
+                height: 160
+           }, &buffer, &to_rect, MagnifySamplerFilter::Nearest);
+        }
+
+        let size = 160;
+        write_to_cubemap(display, main_level, CubeLayer::PositiveX, to_rect, &tex, 0, size);
+        write_to_cubemap(display, main_level, CubeLayer::PositiveY, to_rect, &tex, size, 0);
+        write_to_cubemap(display, main_level, CubeLayer::NegativeZ, to_rect, &tex, size, size);
+        write_to_cubemap(display, main_level, CubeLayer::NegativeX, to_rect, &tex, size * 2, size);
+        write_to_cubemap(display, main_level, CubeLayer::NegativeY, to_rect, &tex, size, size * 2);
+        write_to_cubemap(display, main_level, CubeLayer::PositiveZ, to_rect, &tex, size * 3, size);
+    }
+
+    map
 }
