@@ -35,7 +35,8 @@ fn main() {
     let context = glium::glutin::ContextBuilder::new().with_depth_buffer(24);
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
     let perlin = Perlin::new();
-    perlin.set_seed(rand::thread_rng().gen::<usize>());
+    //perlin.set_seed(rand::thread_rng().gen::<usize>());
+    perlin.set_seed(1);
 
     display.gl_window().window().set_cursor_state(glium::glutin::CursorState::Hide).unwrap();
 
@@ -46,6 +47,15 @@ fn main() {
             .. Default::default()
         },
         backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+        .. Default::default()
+    };
+    let wireframe = &glium::DrawParameters {
+        depth: glium::Depth {
+            test: glium::draw_parameters::DepthTest::IfLessOrEqual,
+            write: true,
+            .. Default::default()
+        },
+        polygon_mode: glium::draw_parameters::PolygonMode::Line,
         .. Default::default()
     };
 
@@ -87,6 +97,10 @@ fn main() {
 	let fragment_shader_src = utils::file_to_string("shaders/fragment.glsl");
 	let program = glium::Program::from_source(&display, &vertex_shader_src, &fragment_shader_src, None).unwrap();
 
+    let wireframe_vertex_shader_src = utils::file_to_string("shaders/wireframe.glsl");
+	let wireframe_fragment_shader_src = utils::file_to_string("shaders/wireframe_fragment.glsl");
+	let wireframe_program = glium::Program::from_source(&display, &wireframe_vertex_shader_src, &wireframe_fragment_shader_src, None).unwrap();
+
     let projection_matrix: [[f32; 4]; 4] = camera.create_projection_matrix(screen_size).into();
     let vertex_buffer = &game::Block::get_vertex_buffer(&mut display);
     let instance_buffer = &game.world.get_instance_buffer(&mut display);
@@ -124,6 +138,13 @@ fn main() {
 
         target.draw(vertex_buffer, index_buffer, &skybox_program, &uniform! { view_matrix: skybox_view_matrix, projection_matrix: projection_matrix, cubemap: skybox_sampled }, skybox_params).unwrap();
         target.draw((vertex_buffer, instance_buffer.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, view_matrix: view_matrix, projection_matrix: projection_matrix, total_blocks: blocks_count }, params).unwrap();
+        match camera.get_targeted_block(&game) {
+            Some(pos) => {
+                println!("{:?}", pos.to_array());
+                target.draw(vertex_buffer, index_buffer, &wireframe_program, &uniform! { view_matrix: view_matrix, projection_matrix: projection_matrix, cube_position: pos.to_array() }, wireframe).unwrap();
+            },
+            None => ()
+        }
         target.finish().unwrap();
 
         let ms = start.elapsed().as_secs() * 1000;
@@ -135,42 +156,45 @@ fn main() {
         let corner_positions = get_player_bounds(camera.position);
 
         camera.translate(-utils::get_up_vector() * gravity_velocity);
-        //gravity_velocity += 0.001;
+        gravity_velocity += 0.001;
 
+        let speed = 0.05;
         if game_input.get_key(VirtualKeyCode::W) {
-            let forward = camera.forward();
-            camera.translate(forward / 32.0);
+            let f = camera.forward_2d(speed);
+            camera.translate(f);
         } else if game_input.get_key(VirtualKeyCode::S) {
-            let forward = camera.forward();
-            camera.translate(-forward / 32.0);
+            let b = camera.forward_2d(-speed);
+            camera.translate(b);
         }
 
         if game_input.get_key(VirtualKeyCode::A) {
-            let right = camera.right();
-            camera.translate(-right / 32.0);
+            let r = -camera.left_2d(speed);
+            camera.translate(r);
         } else if game_input.get_key(VirtualKeyCode::D) {
-            let right = camera.right();
-            camera.translate(right / 32.0);
+            let l = camera.left_2d(speed);
+            camera.translate(l);
         }
 
         if game_input.get_key(VirtualKeyCode::Space) {
-            camera.translate(utils::get_up_vector() / 32.0);
-        } else if game_input.get_key(VirtualKeyCode::LControl) {
-            camera.translate(-utils::get_up_vector() / 32.0);
+            camera.translate(utils::get_up_vector() / 16.0);
         }
 
         if game_input.get_key(VirtualKeyCode::Escape) {
             return;
         }
 
-        /*if game.world.is_in_rendered_world_bounds(game.render_distance, old_pos.x as i64, old_pos.y as i16, old_pos.z as i64) {
-            let mut new_position = camera.position;
+        if game.world.is_in_rendered_world_bounds(game.render_distance, old_pos.x as i64, old_pos.y as i16, old_pos.z as i64) {
+            let mut v = camera.position - old_pos;
             for i in 0..8 {
                 let o = &mut corner_positions[i].clone();
-                gravity_velocity = constrain_camera(&game.world, o, &mut new_position, gravity_velocity);
-                camera.position = nalgebra::Vector3::new(new_position.x, new_position.y, new_position.z);
+                let mut n = &mut (corner_positions[i] + v);
+
+                gravity_velocity = constrain_camera(&game.world, o, &mut n, gravity_velocity);
+
+                v = *n - *o;
             }
-        }*/
+            camera.position = old_pos + v;
+        }
 
         events_loop.poll_events(|ev| {
             match ev {
@@ -206,10 +230,10 @@ fn main() {
 
 fn get_player_bounds(pos: nalgebra::Vector3<f32>) -> [nalgebra::Vector3<f32>; 8] {
     [
-        nalgebra::Vector3::new(pos.x - 0.5, pos.y - 2.0, pos.z - 0.5),
-        nalgebra::Vector3::new(pos.x - 0.5, pos.y - 2.0, pos.z + 0.5),
-        nalgebra::Vector3::new(pos.x + 0.5, pos.y - 2.0, pos.z - 0.5),
-        nalgebra::Vector3::new(pos.x + 0.5, pos.y - 2.0, pos.z + 0.5),
+        nalgebra::Vector3::new(pos.x - 0.5, pos.y - 1.5, pos.z - 0.5),
+        nalgebra::Vector3::new(pos.x - 0.5, pos.y - 1.5, pos.z + 0.5),
+        nalgebra::Vector3::new(pos.x + 0.5, pos.y - 1.5, pos.z - 0.5),
+        nalgebra::Vector3::new(pos.x + 0.5, pos.y - 1.5, pos.z + 0.5),
         nalgebra::Vector3::new(pos.x - 0.5, pos.y, pos.z - 0.5),
         nalgebra::Vector3::new(pos.x - 0.5, pos.y, pos.z + 0.5),
         nalgebra::Vector3::new(pos.x + 0.5, pos.y, pos.z - 0.5),
@@ -254,6 +278,12 @@ fn texture_to_cubemap(tex: Texture2d, display: &mut glium::Display) -> Cubemap {
             width: 160,
             height: 160
         };
+        let reverse_rect = BlitTarget {
+            left: 160,
+            bottom: 160,
+            width: -160,
+            height: -160
+        };
 
         fn write_to_cubemap(display: &mut glium::Display, main_level: CubemapMipmap, side: CubeLayer, to_rect: BlitTarget, tex: &Texture2d, left: u32, right: u32) {
             let buffer = SimpleFrameBuffer::new(display, main_level.image(side)).unwrap();
@@ -267,12 +297,12 @@ fn texture_to_cubemap(tex: Texture2d, display: &mut glium::Display) -> Cubemap {
         }
 
         let size = 160;
-        write_to_cubemap(display, main_level, CubeLayer::PositiveX, to_rect, &tex, 0, size);
-        write_to_cubemap(display, main_level, CubeLayer::PositiveY, to_rect, &tex, size, 0);
-        write_to_cubemap(display, main_level, CubeLayer::NegativeZ, to_rect, &tex, size, size);
-        write_to_cubemap(display, main_level, CubeLayer::NegativeX, to_rect, &tex, size * 2, size);
-        write_to_cubemap(display, main_level, CubeLayer::NegativeY, to_rect, &tex, size, size * 2);
-        write_to_cubemap(display, main_level, CubeLayer::PositiveZ, to_rect, &tex, size * 3, size);
+        write_to_cubemap(display, main_level, CubeLayer::NegativeX, reverse_rect, &tex, 0, size);
+        write_to_cubemap(display, main_level, CubeLayer::NegativeY, to_rect, &tex, size, 0);
+        write_to_cubemap(display, main_level, CubeLayer::NegativeZ, reverse_rect, &tex, size, size);
+        write_to_cubemap(display, main_level, CubeLayer::PositiveX, reverse_rect, &tex, size * 2, size);
+        write_to_cubemap(display, main_level, CubeLayer::PositiveY, to_rect, &tex, size, size * 2);
+        write_to_cubemap(display, main_level, CubeLayer::PositiveZ, reverse_rect, &tex, size * 3, size);
     }
 
     map

@@ -124,13 +124,17 @@ pub struct BlockPos {
 }
 
 impl BlockPos {
-	fn new(x: u32, y: u8, z: u32, block_id: u8) -> BlockPos {
+	pub fn new(x: u32, y: u8, z: u32, block_id: u8) -> BlockPos {
 		BlockPos {
 			x: x,
 			y: y,
 			z: z,
 			block_id: block_id
 		}
+	}
+
+	pub fn to_array(&self) -> [f32; 3] {
+		[self.x as f32, self.y as f32, self.z as f32]
 	}
 }
 
@@ -160,7 +164,7 @@ pub struct Chunk {
 use glium;
 
 pub struct Block {
-	pub id: u8,
+	pub id: u8
 }
 
 use utils;

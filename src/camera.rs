@@ -12,6 +12,7 @@ const FAR_PLANE : f32 = 1000.0;
 
 use utils;
 use alga::linear::Transformation;
+use game;
 
 impl Camera {
 	pub fn new(fov: u32) -> Camera {
@@ -62,11 +63,36 @@ impl Camera {
 		point
 	}
 
+	pub fn forward_2d(&self, speed: f32) -> nalgebra::Vector3<f32> {
+		use std::f32::consts::PI;
+		nalgebra::Vector3::new(f32::cos(self.rot_x + PI / 2.0), 0.0, f32::sin(self.rot_x + PI / 2.0)) * speed
+ 	}
 
 	pub fn right(&self) -> nalgebra::Vector3<f32> {
 		let mut point = nalgebra::Vector3::new(1.0, 0.0, 0.0);
 		point = self.get_view_matrix().transform_vector(&point);
 
 		point
+	}
+
+	pub fn left_2d(&self, speed: f32) -> nalgebra::Vector3<f32> {
+		nalgebra::Vector3::new(f32::cos(self.rot_x), 0.0, f32::sin(self.rot_x)) * speed
+ 	}
+
+	pub fn get_targeted_block(&self, game: &game::Game) -> Option<game::BlockPos> {
+		let mut jump = self.position;
+
+		for _ in 0..10 {
+			if game.world.is_in_rendered_world_bounds(game.render_distance, jump[0] as i64, jump[1] as i16, jump[2] as i64) {
+				let id = game.world.get_block_id(jump[0] as u32, jump[1] as u8, jump[2] as u32);
+				if id != 0 {
+					return Some(game::BlockPos::new(jump[0] as u32, jump[1] as u8, jump[2] as u32, id));
+				}
+			}
+
+			jump += (self.forward() / 5.0);
+		}
+
+		None
 	}
 }
