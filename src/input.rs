@@ -1,14 +1,16 @@
-use glium::glutin::VirtualKeyCode;
+use glium::glutin::{VirtualKeyCode, MouseButton};
 use std::collections::HashMap;
 
 pub struct Input {
-    pub key_map: HashMap<VirtualKeyCode, bool>
+    pub key_map: HashMap<VirtualKeyCode, bool>,
+    pub mouse_map: HashMap<MouseButton, bool>
 }
 
 impl Input {
 	pub fn new() -> Input {
 		Input {
-			key_map: HashMap::new()
+			key_map: HashMap::new(),
+            mouse_map: HashMap::new()
 		}
 	}
 
@@ -18,6 +20,17 @@ impl Input {
 
     pub fn get_key(&mut self, key: VirtualKeyCode) -> bool {
         match self.key_map.get(&key) {
+            Some(down) => *down,
+            _ => false
+        }
+    }
+
+    pub fn set_button(&mut self, button: MouseButton, status: bool) {
+        self.mouse_map.insert(button, status);
+    }
+
+    pub fn get_button(&mut self, button: MouseButton) -> bool {
+        match self.mouse_map.get(&button) {
             Some(down) => *down,
             _ => false
         }

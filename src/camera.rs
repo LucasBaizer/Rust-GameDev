@@ -82,15 +82,15 @@ impl Camera {
 	pub fn get_targeted_block(&self, game: &game::Game) -> Option<game::BlockPos> {
 		let mut jump = self.position;
 
-		for _ in 0..10 {
+		for _ in 0..200 {
 			if game.world.is_in_rendered_world_bounds(game.render_distance, jump[0] as i64, jump[1] as i16, jump[2] as i64) {
 				let id = game.world.get_block_id(jump[0] as u32, jump[1] as u8, jump[2] as u32);
 				if id != 0 {
 					return Some(game::BlockPos::new(jump[0] as u32, jump[1] as u8, jump[2] as u32, id));
 				}
 			}
-
-			jump += (self.forward() / 5.0);
+			
+			jump += self.forward() / 100.0;
 		}
 
 		None

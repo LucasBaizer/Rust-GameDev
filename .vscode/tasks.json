@@ -8,6 +8,18 @@
             "type": "shell",
             "command": "cargo run",
             "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "taskName": "cargo run",
+            "command": "cargo",
+            "args": [
+                "run",
+                "--release"
+            ],
+            "problemMatcher": [
+                "$rustc"
+            ]
         }
     ]
 }

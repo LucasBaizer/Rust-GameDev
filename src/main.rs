@@ -21,7 +21,7 @@ pub struct Instance {
 use rand::Rng;
 fn main() {
     use glium::{glutin, Surface};
-    use glium::glutin::VirtualKeyCode;
+    use glium::glutin::{VirtualKeyCode, MouseButton};
     use std::time::Instant;
     use std::time::Duration;
     use std::thread;
@@ -47,6 +47,9 @@ fn main() {
             .. Default::default()
         },
         backface_culling: glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+        .. Default::default()
+    };
+    let empty_params = &glium::DrawParameters {
         .. Default::default()
     };
     let wireframe = &glium::DrawParameters {
@@ -92,6 +95,7 @@ fn main() {
     use game::Vertex;
 	implement_vertex!(Vertex, position, uv, face);
     implement_vertex!(Instance, matrix, id);
+    implement_vertex!(Vertex2D, position, uv);
 
 	let vertex_shader_src = utils::file_to_string("shaders/vertex.glsl");
 	let fragment_shader_src = utils::file_to_string("shaders/fragment.glsl");
@@ -103,11 +107,19 @@ fn main() {
 
     let projection_matrix: [[f32; 4]; 4] = camera.create_projection_matrix(screen_size).into();
     let vertex_buffer = &game::Block::get_vertex_buffer(&mut display);
-    let instance_buffer = &game.world.get_instance_buffer(&mut display);
+    let mut instance_buffer = game.world.get_instance_buffer(&mut display);
     let index_buffer = &game::Block::get_index_buffer(&mut display);
     //let sampler_raw = glium::texture::Texture2d::with_mipmaps(&mut display, utils::load_image_from_file("textures/blocks/atlas_old.png"), glium::texture::MipmapsOption::NoMipmap).unwrap();
     let sampler_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/blocks/atlas_old.png")).unwrap();
     let sampler = sampler_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
+
+    let crosshair_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/crosshair.png")).unwrap();
+    let crosshair = crosshair_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
+    let crosshair_vertex_shader_src = utils::file_to_string("shaders/crosshair_vertex.glsl");
+	let crosshair_fragment_shader_src = utils::file_to_string("shaders/crosshair_fragment.glsl");
+    let crosshair_program = glium::Program::from_source(&display, &crosshair_vertex_shader_src, &crosshair_fragment_shader_src, None).unwrap();
+    let crosshair_buffer = &glium::VertexBuffer::new(&mut display, &vec![ Vertex2D::new([0.0, 0.0], [0.0, 0.0]), Vertex2D::new([0.0, 1.0], [0.0, 1.0]), Vertex2D::new([1.0, 0.0], [1.0, 0.0]), Vertex2D::new([1.0, 1.0], [1.0, 1.0]) ]).unwrap();
+    let crosshair_indices = &glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
     let skybox_tex_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/skybox.png")).unwrap();
     let skybox_vertex_shader_src = utils::file_to_string("shaders/skybox_vertex.glsl");
@@ -123,6 +135,7 @@ fn main() {
     let mut gravity_velocity: f32 = 0.0;
     let mut dx: f32 = 0.0;
     let mut dy: f32 = 0.0;
+    let mut grounded = false;
     while !closed {
         let start = Instant::now();
 
@@ -136,11 +149,16 @@ fn main() {
         skybox_view_matrix[3][1] = 0.0;
         skybox_view_matrix[3][2] = 0.0;
 
-        target.draw(vertex_buffer, index_buffer, &skybox_program, &uniform! { view_matrix: skybox_view_matrix, projection_matrix: projection_matrix, cubemap: skybox_sampled }, skybox_params).unwrap();
         target.draw((vertex_buffer, instance_buffer.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, view_matrix: view_matrix, projection_matrix: projection_matrix, total_blocks: blocks_count }, params).unwrap();
+        target.draw(vertex_buffer, index_buffer, &program, &uniform! { view_matrix: skybox_view_matrix, projection_matrix: projection_matrix, cubemap: skybox_sampled }, skybox_params).unwrap();
+        target.draw(crosshair_buffer, crosshair_indices, &crosshair_program, &uniform! { sampler: crosshair }, &empty_params).unwrap();
+
         match camera.get_targeted_block(&game) {
             Some(pos) => {
-                println!("{:?}", pos.to_array());
+                if game_input.get_button(MouseButton::Left) {
+                    game.world.set_block(pos.x, pos.y, pos.z, blocks.get_block(0));
+                    instance_buffer = game.world.get_instance_buffer(&mut display);
+                }
                 target.draw(vertex_buffer, index_buffer, &wireframe_program, &uniform! { view_matrix: view_matrix, projection_matrix: projection_matrix, cube_position: pos.to_array() }, wireframe).unwrap();
             },
             None => ()
@@ -156,12 +174,16 @@ fn main() {
         let corner_positions = get_player_bounds(camera.position);
 
         camera.translate(-utils::get_up_vector() * gravity_velocity);
-        gravity_velocity += 0.001;
+        gravity_velocity += 0.003;
 
         let speed = 0.05;
         if game_input.get_key(VirtualKeyCode::W) {
             let f = camera.forward_2d(speed);
-            camera.translate(f);
+            if game_input.get_key(VirtualKeyCode::LShift) {
+                camera.translate(f * 1.3);
+            } else {
+                camera.translate(f);
+            }
         } else if game_input.get_key(VirtualKeyCode::S) {
             let b = camera.forward_2d(-speed);
             camera.translate(b);
@@ -176,7 +198,9 @@ fn main() {
         }
 
         if game_input.get_key(VirtualKeyCode::Space) {
-            camera.translate(utils::get_up_vector() / 16.0);
+            if grounded {
+                gravity_velocity = -0.085;
+            }
         }
 
         if game_input.get_key(VirtualKeyCode::Escape) {
@@ -185,14 +209,20 @@ fn main() {
 
         if game.world.is_in_rendered_world_bounds(game.render_distance, old_pos.x as i64, old_pos.y as i16, old_pos.z as i64) {
             let mut v = camera.position - old_pos;
+            let mut bottom_hit = false;
             for i in 0..8 {
                 let o = &mut corner_positions[i].clone();
                 let mut n = &mut (corner_positions[i] + v);
 
-                gravity_velocity = constrain_camera(&game.world, o, &mut n, gravity_velocity);
-
+                let result = constrain_camera(&game.world, o, &mut n, gravity_velocity);
+                gravity_velocity = result.0;
+                if i < 4 {
+                    bottom_hit = bottom_hit || result.1;
+                }
+            
                 v = *n - *o;
             }
+            grounded = bottom_hit;
             camera.position = old_pos + v;
         }
 
@@ -218,6 +248,14 @@ fn main() {
 
                        camera.rot_y += dy / 10.0 / (180.0 / std::f32::consts::PI);
                    },
+                   glutin::WindowEvent::MouseInput { button, state, .. } => match state {
+                        glutin::ElementState::Pressed => {
+                            game_input.set_button(button, true);
+                        },
+                        glutin::ElementState::Released => {
+                            game_input.set_button(button, false);
+                        }
+                   }
                 	_ => ()
                 },
                 _ => ()
@@ -230,18 +268,18 @@ fn main() {
 
 fn get_player_bounds(pos: nalgebra::Vector3<f32>) -> [nalgebra::Vector3<f32>; 8] {
     [
-        nalgebra::Vector3::new(pos.x - 0.5, pos.y - 1.5, pos.z - 0.5),
-        nalgebra::Vector3::new(pos.x - 0.5, pos.y - 1.5, pos.z + 0.5),
-        nalgebra::Vector3::new(pos.x + 0.5, pos.y - 1.5, pos.z - 0.5),
-        nalgebra::Vector3::new(pos.x + 0.5, pos.y - 1.5, pos.z + 0.5),
-        nalgebra::Vector3::new(pos.x - 0.5, pos.y, pos.z - 0.5),
-        nalgebra::Vector3::new(pos.x - 0.5, pos.y, pos.z + 0.5),
-        nalgebra::Vector3::new(pos.x + 0.5, pos.y, pos.z - 0.5),
-        nalgebra::Vector3::new(pos.x + 0.5, pos.y, pos.z + 0.5)
+        nalgebra::Vector3::new(pos.x - 0.4, pos.y - 1.5, pos.z - 0.4),
+        nalgebra::Vector3::new(pos.x - 0.4, pos.y - 1.5, pos.z + 0.4),
+        nalgebra::Vector3::new(pos.x + 0.4, pos.y - 1.5, pos.z - 0.4),
+        nalgebra::Vector3::new(pos.x + 0.4, pos.y - 1.5, pos.z + 0.4),
+        nalgebra::Vector3::new(pos.x - 0.4, pos.y, pos.z - 0.4),
+        nalgebra::Vector3::new(pos.x - 0.4, pos.y, pos.z + 0.4),
+        nalgebra::Vector3::new(pos.x + 0.4, pos.y, pos.z - 0.4),
+        nalgebra::Vector3::new(pos.x + 0.4, pos.y, pos.z + 0.4)
     ]
 }
 
-fn constrain_camera(world: &game::World, old_pos: &mut nalgebra::Vector3<f32>, new_pos: &mut nalgebra::Vector3<f32>, gravity_velocity: f32) -> f32 {
+fn constrain_camera(world: &game::World, old_pos: &mut nalgebra::Vector3<f32>, new_pos: &mut nalgebra::Vector3<f32>, gravity_velocity: f32) -> (f32, bool) {
     let test_x = (new_pos.x, old_pos.y, old_pos.z);
     if world.is_solid_block(test_x.0, test_x.1, test_x.2) {
         new_pos.x = old_pos.x;
@@ -253,10 +291,10 @@ fn constrain_camera(world: &game::World, old_pos: &mut nalgebra::Vector3<f32>, n
     let test_y = (new_pos.x, new_pos.y, new_pos.z);
     if world.is_solid_block(test_y.0, test_y.1, test_y.2) {
         new_pos.y = old_pos.y;
-        return 0.0;
+        return (0.0, true);
     }
 
-    gravity_velocity
+    (gravity_velocity, false)
 }
 
 use glium::texture::cubemap::Cubemap;
@@ -306,4 +344,19 @@ fn texture_to_cubemap(tex: Texture2d, display: &mut glium::Display) -> Cubemap {
     }
 
     map
+}
+
+#[derive(Copy, Clone)]
+pub struct Vertex2D {
+    pub position: [f32; 2],
+    pub uv: [f32; 2]
+}
+
+impl Vertex2D {
+    pub fn new(position: [f32; 2], uv: [f32; 2]) -> Vertex2D {
+        Vertex2D {
+            position: position,
+            uv: uv
+        }
+    }
 }
