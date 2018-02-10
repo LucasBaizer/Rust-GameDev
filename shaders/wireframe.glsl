@@ -8,4 +8,5 @@ in vec3 position;
 
 void main() {
     gl_Position = projection_matrix * view_matrix * vec4(cube_position + position, 1.0);
+    gl_Position.z -= 0.00001;
 }

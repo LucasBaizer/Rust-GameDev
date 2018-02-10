@@ -40,7 +40,7 @@ impl World {
 		}
 	}
 
-	pub fn get_instance_buffer(&mut self, display: &mut glium::Display) -> glium::VertexBuffer<Instance> {
+	pub fn get_instance_vector(&mut self) -> Vec<Instance> {
 		let mut vec = Vec::new();
 
 		for chunk_x in 0..self.chunks.len() {
@@ -59,7 +59,11 @@ impl World {
             }
         }
 
-        glium::VertexBuffer::new(display, &vec).unwrap()
+		vec
+	}
+
+	pub fn get_instance_buffer(&mut self, display: &mut glium::Display) -> glium::VertexBuffer<Instance> {
+        glium::VertexBuffer::dynamic(display, &self.get_instance_vector()).unwrap()
 	}
 
 	fn set_block_ignore_neighbors(&mut self, raw_x: u32, raw_y: u8, raw_z: u32, block: u8) {
@@ -213,10 +217,12 @@ impl Block {
 		glium::VertexBuffer::new(display, &vertices).unwrap()
 	}
 
+	pub fn get_block_indices() -> [u16; 36] {
+		[0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7, 8, 9, 10, 10, 9, 11, 12, 13, 14, 14, 13, 15, 16, 17, 18, 18, 17, 19, 20, 21, 22, 22, 21, 23]
+	}
+
 	pub fn get_index_buffer(display: &mut glium::Display) -> glium::IndexBuffer<u16> {
-		let indices = vec![0, 1, 2, 2, 1, 3, 4, 5, 6, 6, 5, 7, 8, 9, 10, 10, 9, 11, 12, 13, 14, 14, 13, 15, 16, 17, 18, 18, 17, 19, 20, 21, 22, 22, 21, 23];
-		//let indices = vec![12, 13, 14, 14, 13, 15];
-		glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap()
+		glium::IndexBuffer::new(display, glium::index::PrimitiveType::TrianglesList, &Block::get_block_indices()).unwrap()
 	}
 }
 

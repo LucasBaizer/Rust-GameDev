@@ -79,20 +79,26 @@ impl Camera {
 		nalgebra::Vector3::new(f32::cos(self.rot_x), 0.0, f32::sin(self.rot_x)) * speed
  	}
 
-	pub fn get_targeted_block(&self, game: &game::Game) -> Option<game::BlockPos> {
+	pub fn get_targeted_block(&self, game: &game::Game) -> (Option<game::BlockPos>, Option<game::BlockPos>) {
 		let mut jump = self.position;
+		let mut last = None;
 
-		for _ in 0..200 {
-			if game.world.is_in_rendered_world_bounds(game.render_distance, jump[0] as i64, jump[1] as i16, jump[2] as i64) {
-				let id = game.world.get_block_id(jump[0] as u32, jump[1] as u8, jump[2] as u32);
+		for _ in 0..70 {
+			if game.world.is_in_rendered_world_bounds(game.render_distance, f32::round(jump[0]) as i64, f32::round(jump[1]) as i16, f32::round(jump[2]) as i64) {
+				let ux = f32::round(jump[0]) as u32;
+				let uy = f32::round(jump[1]) as u8;
+				let uz = f32::round(jump[2]) as u32;
+				let id = game.world.get_block_id(ux, uy, uz);
 				if id != 0 {
-					return Some(game::BlockPos::new(jump[0] as u32, jump[1] as u8, jump[2] as u32, id));
+					return (Some(game::BlockPos::new(ux, uy, uz, id)), last);
+				} else {
+					last = Some(game::BlockPos::new(ux, uy, uz, id));
 				}
 			}
 			
-			jump += self.forward() / 100.0;
+			jump += self.forward() / 20.0;
 		}
 
-		None
+		(None, last)
 	}
 }

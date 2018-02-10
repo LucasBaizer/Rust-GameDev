@@ -34,6 +34,7 @@ fn main() {
     let window = glium::glutin::WindowBuilder::new().with_title("Rust Minecraft");
     let context = glium::glutin::ContextBuilder::new().with_depth_buffer(24);
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
+    let window_size = display.get_framebuffer_dimensions();
     let perlin = Perlin::new();
     //perlin.set_seed(rand::thread_rng().gen::<usize>());
     perlin.set_seed(1);
@@ -50,6 +51,18 @@ fn main() {
         .. Default::default()
     };
     let empty_params = &glium::DrawParameters {
+        blend: glium::Blend {
+            color: glium::BlendingFunction::Addition {
+                source: glium::LinearBlendingFactor::SourceAlpha,
+                destination: glium::LinearBlendingFactor::OneMinusSourceAlpha
+            },
+            alpha: glium::BlendingFunction::Addition {
+                source: glium::LinearBlendingFactor::One,
+                destination: glium::LinearBlendingFactor::Zero
+            },
+            ..Default::default()
+           // constant_value: (0.0, 0.0, 0.0, 0.0)
+        },
         .. Default::default()
     };
     let wireframe = &glium::DrawParameters {
@@ -119,7 +132,7 @@ fn main() {
 	let crosshair_fragment_shader_src = utils::file_to_string("shaders/crosshair_fragment.glsl");
     let crosshair_program = glium::Program::from_source(&display, &crosshair_vertex_shader_src, &crosshair_fragment_shader_src, None).unwrap();
     let crosshair_buffer = &glium::VertexBuffer::new(&mut display, &vec![ Vertex2D::new([0.0, 0.0], [0.0, 0.0]), Vertex2D::new([0.0, 1.0], [0.0, 1.0]), Vertex2D::new([1.0, 0.0], [1.0, 0.0]), Vertex2D::new([1.0, 1.0], [1.0, 1.0]) ]).unwrap();
-    let crosshair_indices = &glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+    let crosshair_indices = &glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip);
 
     let skybox_tex_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/skybox.png")).unwrap();
     let skybox_vertex_shader_src = utils::file_to_string("shaders/skybox_vertex.glsl");
@@ -127,6 +140,16 @@ fn main() {
     let skybox_program = glium::Program::from_source(&display, &skybox_vertex_shader_src, &skybox_fragment_shader_src, None).unwrap();
     let skybox = texture_to_cubemap(skybox_tex_raw, &mut display);
     let skybox_sampled = skybox.sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Clamp);
+
+    // let wireframe_indices = &glium::IndexBuffer::new(&mut display, glium::index::PrimitiveType::LinesList, &[0, 1, 0, 2, 0, 3]);
+
+    let orthographic_matrix: [[f32; 4]; 4] = (*nalgebra::Orthographic3::new(0.0, window_size.0 as f32, 0.0, window_size.1 as f32, 0.1, 2.0).as_matrix()).into();
+    let crosshair_matrix: [[f32; 4]; 4] = [
+        [36.0, 0.0, 0.0, 0.0],
+        [0.0, 36.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [window_size.0 as f32 / 2.0 - 18.0, window_size.1 as f32 / 2.0 - 18.0, 0.0, 1.0]
+    ];
 
     camera.translate(utils::get_up_vector() * 72.0);
     camera.translate(utils::get_right_vector() * 4.0);
@@ -149,20 +172,45 @@ fn main() {
         skybox_view_matrix[3][1] = 0.0;
         skybox_view_matrix[3][2] = 0.0;
 
-        target.draw((vertex_buffer, instance_buffer.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, view_matrix: view_matrix, projection_matrix: projection_matrix, total_blocks: blocks_count }, params).unwrap();
-        target.draw(vertex_buffer, index_buffer, &program, &uniform! { view_matrix: skybox_view_matrix, projection_matrix: projection_matrix, cubemap: skybox_sampled }, skybox_params).unwrap();
-        target.draw(crosshair_buffer, crosshair_indices, &crosshair_program, &uniform! { sampler: crosshair }, &empty_params).unwrap();
+        {
+            target.draw(vertex_buffer, index_buffer, &skybox_program, &uniform! { view_matrix: skybox_view_matrix, projection_matrix: projection_matrix, cubemap: skybox_sampled }, skybox_params).unwrap();
+            target.draw((vertex_buffer, instance_buffer.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, view_matrix: view_matrix, projection_matrix: projection_matrix, total_blocks: blocks_count }, params).unwrap();
+        }
 
-        match camera.get_targeted_block(&game) {
+        let target_tuple = camera.get_targeted_block(&game);
+        match target_tuple.0 {
             Some(pos) => {
-                if game_input.get_button(MouseButton::Left) {
+                if game_input.get_button_down(MouseButton::Left) {
                     game.world.set_block(pos.x, pos.y, pos.z, blocks.get_block(0));
                     instance_buffer = game.world.get_instance_buffer(&mut display);
+                    /*let mut mat = utils::get_identity_matrix();
+            		mat[(0, 3)] = pos.x as f32;
+					mat[(1, 3)] = pos.y as f32;
+					mat[(2, 3)] = pos.z as f32;
+
+                    let map_write = instance_buffer.map_write();
+                    map_write.set((pos.x * 256) + (pos.y as u32 * 16) + pos.z), Instance { matrix: mat.into(), id: 0 });*/
+                    //map_write.write(game.world.get_instance_vector().as_slice());
+                }
+                if game_input.get_button_down(MouseButton::Right) {
+                    match target_tuple.1 {
+                        Some(new) => {
+                            let cam = camera.position;
+                            let round = nalgebra::Vector3::<u32>::new(f32::round(cam[0]) as u32, f32::round(cam[1]) as u32, f32::round(cam[2]) as u32);
+
+                            if round[0] != new.x || round[1] as u8 != new.y || round[2] != new.z {
+                                game.world.set_block(new.x, new.y, new.z, blocks.get_block(game::BlockType::Cobblestone as u8));
+                                instance_buffer = game.world.get_instance_buffer(&mut display);
+                            }
+                        },
+                        None => ()
+                    }
                 }
                 target.draw(vertex_buffer, index_buffer, &wireframe_program, &uniform! { view_matrix: view_matrix, projection_matrix: projection_matrix, cube_position: pos.to_array() }, wireframe).unwrap();
             },
             None => ()
         }
+        target.draw(crosshair_buffer, crosshair_indices, &crosshair_program, &uniform! { transform_matrix: crosshair_matrix, projection_matrix: orthographic_matrix, sampler: crosshair }, &empty_params).unwrap();
         target.finish().unwrap();
 
         let ms = start.elapsed().as_secs() * 1000;
@@ -226,6 +274,9 @@ fn main() {
             camera.position = old_pos + v;
         }
 
+        game_input.set_button_down(MouseButton::Left, false);
+        game_input.set_button_down(MouseButton::Right, false);
+
         events_loop.poll_events(|ev| {
             match ev {
                 glutin::Event::WindowEvent { event, .. } => match event {
@@ -247,16 +298,17 @@ fn main() {
                        camera.rot_y = utils::clamp(camera.rot_y, -(3.14 / 2.0), 3.14 / 2.0);
 
                        camera.rot_y += dy / 10.0 / (180.0 / std::f32::consts::PI);
-                   },
-                   glutin::WindowEvent::MouseInput { button, state, .. } => match state {
+                    },
+                    glutin::WindowEvent::MouseInput { button, state, .. } => match state {
                         glutin::ElementState::Pressed => {
                             game_input.set_button(button, true);
+                            game_input.set_button_down(button, true);
                         },
                         glutin::ElementState::Released => {
                             game_input.set_button(button, false);
                         }
-                   }
-                	_ => ()
+                    },
+                    _ => ()
                 },
                 _ => ()
             }
