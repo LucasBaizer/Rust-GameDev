@@ -5,12 +5,14 @@ extern crate nalgebra;
 extern crate alga;
 extern crate noise;
 extern crate rand;
+extern crate bytebuffer;
 
 mod camera;
 mod object;
 mod utils;
 mod game;
 mod input;
+mod net;
 
 #[derive(Clone, Copy)]
 pub struct Instance {
@@ -26,9 +28,15 @@ fn main() {
     use std::time::Duration;
     use std::thread;
     use noise::{Perlin, NoiseModule, Seedable};
+    use net::NetClient;
 
     let mut camera: camera::Camera = camera::Camera::new(90);
     let mut game_input: input::Input = input::Input::new();
+
+    thread::spawn(|| {
+            let net_client = NetClient::new();
+
+    });
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let window = glium::glutin::WindowBuilder::new().with_title("Rust Minecraft");
