@@ -63,7 +63,7 @@ impl World {
 	}
 
 	pub fn get_instance_buffer(&mut self, display: &mut glium::Display) -> glium::VertexBuffer<Instance> {
-        glium::VertexBuffer::dynamic(display, &self.get_instance_vector()).unwrap()
+        glium::VertexBuffer::new(display, &self.get_instance_vector()).unwrap()
 	}
 
 	fn set_block_ignore_neighbors(&mut self, raw_x: u32, raw_y: u8, raw_z: u32, block: u8) {
@@ -146,6 +146,90 @@ impl PartialEq for BlockPos {
 	fn eq(&self, other: &BlockPos) -> bool {
         self.x == other.x && self.y == other.y && self.z == other.z
     }
+}
+
+#[derive(Copy, Clone)]
+pub struct ItemStack {
+	pub id: u8,
+	pub count: u8
+}
+
+impl ItemStack {
+	pub fn new(id: u8, count: u8) -> ItemStack {
+		ItemStack {
+			id: id,
+			count: count
+		}
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.count == 0
+	}
+}
+
+pub struct Player {
+	inventory: [[ItemStack; 9]; 4],
+	pub selected_index: u8
+}
+
+impl Player {
+	pub fn new() -> Player {
+		Player {
+			inventory: [[ItemStack::new(0, 0); 9]; 4],
+			selected_index: 0
+		}
+	}
+
+	pub fn get_inventory(&self) -> &[[ItemStack; 9]] {
+		&self.inventory[1..4]
+	}
+
+	pub fn get_hotbar(&mut self) -> &mut [ItemStack; 9] {
+		&mut self.inventory[0]
+	}
+
+	pub fn get_inventory_contents(&mut self) -> &mut [[ItemStack; 9]; 4] {
+		&mut self.inventory
+	}
+
+	pub fn push_item(&mut self, item: ItemStack) -> u8 {
+		use std::cmp;
+		if item.is_empty() {
+			return 0;
+		}
+
+		let mut left = item.count;
+
+		for row in 0..4 {
+			for slot in 0..9 {
+				let stack = self.inventory[row][slot];
+				if stack.is_empty() {
+					self.inventory[row][slot] = item;
+					return 0;
+				} else {
+					if stack.id == item.id {
+						let sc = stack.count as i16;
+						let si = left as i16;
+
+						let max = 255 - sc;
+						let leftover = cmp::min(si - max, 0);
+						let to_add = si - leftover;
+
+						if to_add > 0 {
+							self.inventory[row][slot].count += to_add as u8;
+							left -= to_add as u8;
+						}
+
+						if left == 0 {
+							return 0;
+						}
+					}
+				}
+			}
+		}
+
+		left
+	}
 }
 
 use std::hash::{Hash, Hasher};

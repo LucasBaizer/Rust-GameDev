@@ -29,14 +29,18 @@ fn main() {
     use std::thread;
     use noise::{Perlin, NoiseModule, Seedable};
     use net::NetClient;
+    use game::ItemStack;
+    use game::Player;
+
+    let mut player = Player::new();
 
     let mut camera: camera::Camera = camera::Camera::new(90);
     let mut game_input: input::Input = input::Input::new();
 
-    thread::spawn(|| {
-            let net_client = NetClient::new();
+    /*thread::spawn(|| {
+        let net_client = NetClient::new();
 
-    });
+    });*/
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let window = glium::glutin::WindowBuilder::new().with_title("Rust Minecraft");
@@ -69,7 +73,6 @@ fn main() {
                 destination: glium::LinearBlendingFactor::Zero
             },
             ..Default::default()
-           // constant_value: (0.0, 0.0, 0.0, 0.0)
         },
         .. Default::default()
     };
@@ -136,9 +139,23 @@ fn main() {
 
     let crosshair_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/crosshair.png")).unwrap();
     let crosshair = crosshair_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
-    let crosshair_vertex_shader_src = utils::file_to_string("shaders/crosshair_vertex.glsl");
-	let crosshair_fragment_shader_src = utils::file_to_string("shaders/crosshair_fragment.glsl");
-    let crosshair_program = glium::Program::from_source(&display, &crosshair_vertex_shader_src, &crosshair_fragment_shader_src, None).unwrap();
+    let hotbar_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/hotbar.png")).unwrap();
+    let hotbar = hotbar_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
+    let hotbar_selected_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/hotbar_selected.png")).unwrap();
+    let hotbar_selected = hotbar_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
+
+    let text_vertex_shader_src = utils::file_to_string("shaders/text_vertex.glsl");
+	let text_fragment_shader_src = utils::file_to_string("shaders/text_fragment.glsl");
+    let text_program = glium::Program::from_source(&display, &text_vertex_shader_src, &text_fragment_shader_src, None).unwrap();
+    let text_image_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/numbers.png")).unwrap();
+    let text_image = text_image_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
+
+    let hotbar_buffer = &glium::VertexBuffer::new(&mut display, &vec![ Vertex2D::new([0.0, 0.0], [0.0, 0.0]), Vertex2D::new([0.0, 1.0], [0.0, 1.0]), Vertex2D::new([1.0, 0.0], [1.0, 0.0]), Vertex2D::new([1.0, 1.0], [1.0, 1.0]) ]).unwrap();
+    let hotbar_indices = &glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip);
+
+    let flat_vertex_shader_src = utils::file_to_string("shaders/2d_vertex.glsl");
+	let flat_fragment_shader_src = utils::file_to_string("shaders/2d_fragment.glsl");
+    let flat_program = glium::Program::from_source(&display, &flat_vertex_shader_src, &flat_fragment_shader_src, None).unwrap();
     let crosshair_buffer = &glium::VertexBuffer::new(&mut display, &vec![ Vertex2D::new([0.0, 0.0], [0.0, 0.0]), Vertex2D::new([0.0, 1.0], [0.0, 1.0]), Vertex2D::new([1.0, 0.0], [1.0, 0.0]), Vertex2D::new([1.0, 1.0], [1.0, 1.0]) ]).unwrap();
     let crosshair_indices = &glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip);
 
@@ -151,12 +168,18 @@ fn main() {
 
     // let wireframe_indices = &glium::IndexBuffer::new(&mut display, glium::index::PrimitiveType::LinesList, &[0, 1, 0, 2, 0, 3]);
 
-    let orthographic_matrix: [[f32; 4]; 4] = (*nalgebra::Orthographic3::new(0.0, window_size.0 as f32, 0.0, window_size.1 as f32, 0.1, 2.0).as_matrix()).into();
+    let orthographic_matrix: [[f32; 4]; 4] = (*nalgebra::Orthographic3::new(0.0, window_size.0 as f32, 0.0, window_size.1 as f32, 0.1, 100.0).as_matrix()).into();
     let crosshair_matrix: [[f32; 4]; 4] = [
         [36.0, 0.0, 0.0, 0.0],
         [0.0, 36.0, 0.0, 0.0],
         [0.0, 0.0, 1.0, 0.0],
         [window_size.0 as f32 / 2.0 - 18.0, window_size.1 as f32 / 2.0 - 18.0, 0.0, 1.0]
+    ];
+    let hotbar_matrix: [[f32; 4]; 4] = [
+        [182.0 * 2.5, 0.0, 0.0, 0.0],
+        [0.0, 22.0 * 2.5, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [window_size.0 as f32 / 2.0 - (91.0 * 2.5), 33.0, 0.0, 1.0]
     ];
 
     camera.translate(utils::get_up_vector() * 72.0);
@@ -189,26 +212,25 @@ fn main() {
         match target_tuple.0 {
             Some(pos) => {
                 if game_input.get_button_down(MouseButton::Left) {
+                    player.push_item(ItemStack::new(game.world.get_block_id(pos.x, pos.y, pos.z), 1));
                     game.world.set_block(pos.x, pos.y, pos.z, blocks.get_block(0));
                     instance_buffer = game.world.get_instance_buffer(&mut display);
-                    /*let mut mat = utils::get_identity_matrix();
-            		mat[(0, 3)] = pos.x as f32;
-					mat[(1, 3)] = pos.y as f32;
-					mat[(2, 3)] = pos.z as f32;
-
-                    let map_write = instance_buffer.map_write();
-                    map_write.set((pos.x * 256) + (pos.y as u32 * 16) + pos.z), Instance { matrix: mat.into(), id: 0 });*/
-                    //map_write.write(game.world.get_instance_vector().as_slice());
                 }
                 if game_input.get_button_down(MouseButton::Right) {
                     match target_tuple.1 {
                         Some(new) => {
-                            let cam = camera.position;
-                            let round = nalgebra::Vector3::<u32>::new(f32::round(cam[0]) as u32, f32::round(cam[1]) as u32, f32::round(cam[2]) as u32);
+                            let index = player.selected_index;
+                            let mut slctd = player.get_hotbar()[index as usize];
+                            if !slctd.is_empty() {
+                                let cam = camera.position;
+                                let round = nalgebra::Vector3::<u32>::new(f32::round(cam[0]) as u32, f32::round(cam[1]) as u32, f32::round(cam[2]) as u32);
 
-                            if round[0] != new.x || round[1] as u8 != new.y || round[2] != new.z {
-                                game.world.set_block(new.x, new.y, new.z, blocks.get_block(game::BlockType::Cobblestone as u8));
-                                instance_buffer = game.world.get_instance_buffer(&mut display);
+                                if round[0] != new.x || round[1] as u8 != new.y || round[2] != new.z {
+                                    game.world.set_block(new.x, new.y, new.z, blocks.get_block(slctd.id));
+                                    instance_buffer = game.world.get_instance_buffer(&mut display);
+                                }
+
+                                slctd.count -= 1;
                             }
                         },
                         None => ()
@@ -218,7 +240,40 @@ fn main() {
             },
             None => ()
         }
-        target.draw(crosshair_buffer, crosshair_indices, &crosshair_program, &uniform! { transform_matrix: crosshair_matrix, projection_matrix: orthographic_matrix, sampler: crosshair }, &empty_params).unwrap();
+        target.draw(crosshair_buffer, crosshair_indices, &flat_program, &uniform! { transform_matrix: crosshair_matrix, projection_matrix: orthographic_matrix, sampler: crosshair }, &empty_params).unwrap();
+        target.draw(hotbar_buffer, hotbar_indices, &flat_program, &uniform! { transform_matrix: hotbar_matrix, projection_matrix: orthographic_matrix, sampler: hotbar }, &empty_params).unwrap();
+
+        for i in 0..9 {
+            let hb = player.get_hotbar();
+            if !hb[i].is_empty() {
+                println!("{:?}", hb[i].count);
+
+                let mut transformation = utils::get_identity_matrix();
+                let rot: nalgebra::Matrix4<f32> = nalgebra::Matrix4::from_euler_angles(f32::to_radians(-30.0), 0.0, 0.0) * nalgebra::Matrix4::from_euler_angles(0.0, f32::to_radians(-45.0), 0.0);
+
+                let w = 22.0 * 2.5 / 2.0;
+
+                transformation[(0, 0)] = w * 0.8;
+                transformation[(1, 1)] = w * 0.8;
+                transformation[(2, 2)] = w * 0.8;
+
+                transformation[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * 1.0) + ((22.0 * 2.5) / 2.0) + 1.0;
+                transformation[(1, 3)] = 33.0 + ((22.0 * 2.5) / 2.0) - 1.0;
+                transformation[(2, 3)] = -33.0;
+
+                transformation *= rot;
+
+                let instance = glium::VertexBuffer::new(&mut display, 
+                    &vec![
+                        Instance {
+            			    matrix: transformation.into(),
+            		    	id: hb[i].id
+                        }
+                    ]).unwrap();
+                let into: [[f32; 4]; 4] = utils::get_identity_matrix().into();
+                target.draw((vertex_buffer, instance.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, projection_matrix: orthographic_matrix, view_matrix: into, total_blocks: blocks_count }, params ).unwrap();
+            }
+        }
         target.finish().unwrap();
 
         let ms = start.elapsed().as_secs() * 1000;
@@ -230,13 +285,13 @@ fn main() {
         let corner_positions = get_player_bounds(camera.position);
 
         camera.translate(-utils::get_up_vector() * gravity_velocity);
-        gravity_velocity += 0.003;
+        gravity_velocity += 0.0055;
 
         let speed = 0.05;
         if game_input.get_key(VirtualKeyCode::W) {
             let f = camera.forward_2d(speed);
             if game_input.get_key(VirtualKeyCode::LShift) {
-                camera.translate(f * 1.3);
+                camera.translate(f * 1.5);
             } else {
                 camera.translate(f);
             }
@@ -255,7 +310,7 @@ fn main() {
 
         if game_input.get_key(VirtualKeyCode::Space) {
             if grounded {
-                gravity_velocity = -0.085;
+                gravity_velocity = -0.12;
             }
         }
 
