@@ -151,14 +151,16 @@ impl PartialEq for BlockPos {
 #[derive(Copy, Clone)]
 pub struct ItemStack {
 	pub id: u8,
-	pub count: u8
+	pub count: u8,
+	pub max: u8
 }
 
 impl ItemStack {
-	pub fn new(id: u8, count: u8) -> ItemStack {
+	pub fn new(id: u8, count: u8, max: u8) -> ItemStack {
 		ItemStack {
 			id: id,
-			count: count
+			count: count,
+			max: max
 		}
 	}
 
@@ -175,7 +177,7 @@ pub struct Player {
 impl Player {
 	pub fn new() -> Player {
 		Player {
-			inventory: [[ItemStack::new(0, 0); 9]; 4],
+			inventory: [[ItemStack::new(0, 0, 64); 9]; 4],
 			selected_index: 0
 		}
 	}
@@ -203,27 +205,31 @@ impl Player {
 		for row in 0..4 {
 			for slot in 0..9 {
 				let stack = self.inventory[row][slot];
+
+				if stack.id == item.id {
+					let sc = stack.count as i16;
+					let si = left as i16;
+					let max = stack.max as i16 - sc;
+					let leftover = cmp::max(si - max, 0);
+					let to_add = si - leftover;
+					if to_add > 0 {
+						self.inventory[row][slot].count += to_add as u8;
+						left -= to_add as u8;
+					}
+					if left == 0 {
+						return 0;
+					}
+				}
+			}
+		}
+
+		for row in 0..4 {
+			for slot in 0..9 {
+				let stack = self.inventory[row][slot];
+
 				if stack.is_empty() {
 					self.inventory[row][slot] = item;
 					return 0;
-				} else {
-					if stack.id == item.id {
-						let sc = stack.count as i16;
-						let si = left as i16;
-
-						let max = 255 - sc;
-						let leftover = cmp::min(si - max, 0);
-						let to_add = si - leftover;
-
-						if to_add > 0 {
-							self.inventory[row][slot].count += to_add as u8;
-							left -= to_add as u8;
-						}
-
-						if left == 0 {
-							return 0;
-						}
-					}
 				}
 			}
 		}

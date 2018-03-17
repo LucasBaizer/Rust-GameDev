@@ -142,16 +142,20 @@ fn main() {
     let hotbar_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/hotbar.png")).unwrap();
     let hotbar = hotbar_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
     let hotbar_selected_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/hotbar_selected.png")).unwrap();
-    let hotbar_selected = hotbar_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
-
+    let hotbar_selected = hotbar_selected_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
+    
     let text_vertex_shader_src = utils::file_to_string("shaders/text_vertex.glsl");
 	let text_fragment_shader_src = utils::file_to_string("shaders/text_fragment.glsl");
     let text_program = glium::Program::from_source(&display, &text_vertex_shader_src, &text_fragment_shader_src, None).unwrap();
     let text_image_raw = glium::texture::Texture2d::new(&mut display, utils::load_image_from_file("textures/numbers.png")).unwrap();
     let text_image = text_image_raw.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest);
+    let text_vertex = &glium::VertexBuffer::new(&mut display, &vec![ Vertex2D::new([0.0, 0.0], [0.0, 0.0]), Vertex2D::new([0.0, 1.0], [0.0, 1.0]), Vertex2D::new([1.0, 0.0], [1.0, 0.0]), Vertex2D::new([1.0, 1.0], [1.0, 1.0]) ]).unwrap();
+    let text_indices = &glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip);
 
     let hotbar_buffer = &glium::VertexBuffer::new(&mut display, &vec![ Vertex2D::new([0.0, 0.0], [0.0, 0.0]), Vertex2D::new([0.0, 1.0], [0.0, 1.0]), Vertex2D::new([1.0, 0.0], [1.0, 0.0]), Vertex2D::new([1.0, 1.0], [1.0, 1.0]) ]).unwrap();
     let hotbar_indices = &glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip);
+    let hotbar_selected_buffer = &glium::VertexBuffer::new(&mut display, &vec![ Vertex2D::new([0.0, 0.0], [0.0, 0.0]), Vertex2D::new([0.0, 1.0], [0.0, 1.0]), Vertex2D::new([1.0, 0.0], [1.0, 0.0]), Vertex2D::new([1.0, 1.0], [1.0, 1.0]) ]).unwrap();
+    let hotbar_selected_indices = &glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip);
 
     let flat_vertex_shader_src = utils::file_to_string("shaders/2d_vertex.glsl");
 	let flat_fragment_shader_src = utils::file_to_string("shaders/2d_fragment.glsl");
@@ -212,7 +216,7 @@ fn main() {
         match target_tuple.0 {
             Some(pos) => {
                 if game_input.get_button_down(MouseButton::Left) {
-                    player.push_item(ItemStack::new(game.world.get_block_id(pos.x, pos.y, pos.z), 1));
+                    player.push_item(ItemStack::new(game.world.get_block_id(pos.x, pos.y, pos.z), 1, 64));
                     game.world.set_block(pos.x, pos.y, pos.z, blocks.get_block(0));
                     instance_buffer = game.world.get_instance_buffer(&mut display);
                 }
@@ -220,7 +224,7 @@ fn main() {
                     match target_tuple.1 {
                         Some(new) => {
                             let index = player.selected_index;
-                            let mut slctd = player.get_hotbar()[index as usize];
+                            let mut slctd = &mut player.get_hotbar()[index as usize];
                             if !slctd.is_empty() {
                                 let cam = camera.position;
                                 let round = nalgebra::Vector3::<u32>::new(f32::round(cam[0]) as u32, f32::round(cam[1]) as u32, f32::round(cam[2]) as u32);
@@ -243,11 +247,24 @@ fn main() {
         target.draw(crosshair_buffer, crosshair_indices, &flat_program, &uniform! { transform_matrix: crosshair_matrix, projection_matrix: orthographic_matrix, sampler: crosshair }, &empty_params).unwrap();
         target.draw(hotbar_buffer, hotbar_indices, &flat_program, &uniform! { transform_matrix: hotbar_matrix, projection_matrix: orthographic_matrix, sampler: hotbar }, &empty_params).unwrap();
 
+        let mut hotbar_selected_matrix = utils::get_identity_matrix();
+
+        let w = 22.0 * 2.5;
+
+        hotbar_selected_matrix[(0, 0)] = w;
+        hotbar_selected_matrix[(1, 1)] = w;
+        hotbar_selected_matrix[(2, 2)] = w;
+
+        hotbar_selected_matrix[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (player.selected_index as f32 * (22.0 * 2.5));
+        hotbar_selected_matrix[(1, 3)] = 33.0;
+        hotbar_selected_matrix[(2, 3)] = -1.0;
+
+        let into: [[f32; 4]; 4] = hotbar_selected_matrix.into();
+        target.draw(hotbar_selected_buffer, hotbar_selected_indices, &flat_program, &uniform! { transform_matrix: into, projection_matrix: orthographic_matrix, sampler: hotbar_selected }, &empty_params).unwrap();
+
         for i in 0..9 {
             let hb = player.get_hotbar();
             if !hb[i].is_empty() {
-                println!("{:?}", hb[i].count);
-
                 let mut transformation = utils::get_identity_matrix();
                 let rot: nalgebra::Matrix4<f32> = nalgebra::Matrix4::from_euler_angles(f32::to_radians(-30.0), 0.0, 0.0) * nalgebra::Matrix4::from_euler_angles(0.0, f32::to_radians(-45.0), 0.0);
 
@@ -257,23 +274,39 @@ fn main() {
                 transformation[(1, 1)] = w * 0.8;
                 transformation[(2, 2)] = w * 0.8;
 
-                transformation[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * 1.0) + ((22.0 * 2.5) / 2.0) + 1.0;
+                transformation[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (22.0 * 2.5)) + ((22.0 * 2.5) / 2.0) + 1.0;
                 transformation[(1, 3)] = 33.0 + ((22.0 * 2.5) / 2.0) - 1.0;
                 transformation[(2, 3)] = -33.0;
 
-                transformation *= rot;
+                let rotated = transformation * rot;
 
                 let instance = glium::VertexBuffer::new(&mut display, 
                     &vec![
                         Instance {
-            			    matrix: transformation.into(),
+            			    matrix: rotated.into(),
             		    	id: hb[i].id
                         }
                     ]).unwrap();
                 let into: [[f32; 4]; 4] = utils::get_identity_matrix().into();
                 target.draw((vertex_buffer, instance.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, projection_matrix: orthographic_matrix, view_matrix: into, total_blocks: blocks_count }, params ).unwrap();
+                
+                let txt = hb[i].count.to_string();
+                let mut transformation = utils::get_identity_matrix();
+                transformation[(0, 0)] = w * 0.5;
+                transformation[(1, 1)] = w * 0.5;
+                transformation[(2, 2)] = w * 0.5;
+
+                transformation[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (22.0 * 2.5)) + (22.0 * 2.5) - (w * 0.75);
+                transformation[(1, 3)] = 33.0 + (w * 0.3);
+                transformation[(2, 3)] = -1.0;
+
+                let transform_into: [[f32; 4]; 4] = transformation.into();
+                for ch in txt.bytes() {
+                    target.draw(text_vertex, text_indices, &text_program, &uniform! { transform_matrix: transform_into, projection_matrix: orthographic_matrix, sampler: text_image, character: (ch - b'0') as i32 }, &empty_params).unwrap();
+                }
             }
         }
+        
         target.finish().unwrap();
 
         let ms = start.elapsed().as_secs() * 1000;
@@ -286,6 +319,14 @@ fn main() {
 
         camera.translate(-utils::get_up_vector() * gravity_velocity);
         gravity_velocity += 0.0055;
+
+        let number_keys = [VirtualKeyCode::Key1, VirtualKeyCode::Key2, VirtualKeyCode::Key3, VirtualKeyCode::Key4, VirtualKeyCode::Key5, VirtualKeyCode::Key6, VirtualKeyCode::Key7, VirtualKeyCode::Key8, VirtualKeyCode::Key9];
+        for i in 0..9 {
+            if game_input.get_key(number_keys[i]) {
+                player.selected_index = i as u8;
+                break;
+            }
+        }
 
         let speed = 0.05;
         if game_input.get_key(VirtualKeyCode::W) {
