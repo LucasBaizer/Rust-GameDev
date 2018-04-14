@@ -258,15 +258,25 @@ pub struct Chunk {
 use glium;
 
 pub struct Block {
-	pub id: u8
+	pub id: u8,
+	pub drop_id: u8
 }
 
 use utils;
 
 impl Block {
 	pub fn new(id: BlockType) -> Block {
+		let block_id: u8 = id as u8;
 		Block {
-			id: id as u8
+			id: block_id,
+			drop_id: block_id
+		}
+	}
+
+	pub fn new_with_drop_type(id: BlockType, drop_id: BlockType) -> Block {
+		Block {
+			id: id as u8,
+			drop_id: drop_id as u8
 		}
 	}
 
@@ -318,9 +328,10 @@ impl Block {
 
 pub enum BlockType {
 	Air = 0,
-	Cobblestone = 1,
-	Dirt = 2,
-	Grass = 3
+	Stone = 1,
+	Cobblestone = 2,
+	Dirt = 3,
+	Grass = 4
 }
 
 pub struct Blocks {
@@ -336,6 +347,7 @@ impl Blocks {
 
 	pub fn initialize(&mut self) {
 		self.block_map.push(Block::new(BlockType::Air));
+		self.block_map.push(Block::new_with_drop_type(BlockType::Stone, BlockType::Cobblestone));
 		self.block_map.push(Block::new(BlockType::Cobblestone));
 		self.block_map.push(Block::new(BlockType::Dirt));
 		self.block_map.push(Block::new(BlockType::Grass));

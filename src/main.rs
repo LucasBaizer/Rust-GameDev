@@ -102,10 +102,10 @@ fn main() {
             for y in 0..height {
                 let mut block = 1;
                 if height - y <= 4 {
-                    block = 2;
+                    block = 3;
                 }
                 if height - 1 == y {
-                    block = 3;
+                    block = 4;
                 }
                 game.world.set_block(x, y, z, blocks.get_block(block));
             }
@@ -216,7 +216,7 @@ fn main() {
         match target_tuple.0 {
             Some(pos) => {
                 if game_input.get_button_down(MouseButton::Left) {
-                    player.push_item(ItemStack::new(game.world.get_block_id(pos.x, pos.y, pos.z), 1, 64));
+                    player.push_item(ItemStack::new(game.world.get_block(&blocks, pos.x, pos.y, pos.z).drop_id, 1, 64));
                     game.world.set_block(pos.x, pos.y, pos.z, blocks.get_block(0));
                     instance_buffer = game.world.get_instance_buffer(&mut display);
                 }
@@ -249,14 +249,14 @@ fn main() {
 
         let mut hotbar_selected_matrix = utils::get_identity_matrix();
 
-        let w = 22.0 * 2.5;
+        let w = 24.0 * 2.5;
 
         hotbar_selected_matrix[(0, 0)] = w;
         hotbar_selected_matrix[(1, 1)] = w;
         hotbar_selected_matrix[(2, 2)] = w;
 
-        hotbar_selected_matrix[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (player.selected_index as f32 * (22.0 * 2.5));
-        hotbar_selected_matrix[(1, 3)] = 33.0;
+        hotbar_selected_matrix[(0, 3)] = (window_size.0 as f32) / 2.0 - (91.0 * 2.5) + (player.selected_index as f32 * (20.0 * 2.5)) - 1.0;
+        hotbar_selected_matrix[(1, 3)] = 32.0;
         hotbar_selected_matrix[(2, 3)] = -1.0;
 
         let into: [[f32; 4]; 4] = hotbar_selected_matrix.into();
@@ -274,7 +274,7 @@ fn main() {
                 transformation[(1, 1)] = w * 0.8;
                 transformation[(2, 2)] = w * 0.8;
 
-                transformation[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (22.0 * 2.5)) + ((22.0 * 2.5) / 2.0) + 1.0;
+                transformation[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (20.0 * 2.5)) + ((20.0 * 2.5) / 2.0) + 3.0;
                 transformation[(1, 3)] = 33.0 + ((22.0 * 2.5) / 2.0) - 1.0;
                 transformation[(2, 3)] = -33.0;
 
@@ -296,17 +296,20 @@ fn main() {
                 transformation[(1, 1)] = w * 0.5;
                 transformation[(2, 2)] = w * 0.5;
 
-                transformation[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (22.0 * 2.5)) + (22.0 * 2.5) - (w * 0.75);
                 transformation[(1, 3)] = 33.0 + (w * 0.3);
                 transformation[(2, 3)] = -1.0;
 
-                let transform_into: [[f32; 4]; 4] = transformation.into();
+                let mut idx = txt.len() as f32 - 1.0;
                 for ch in txt.bytes() {
+                    transformation[(0, 3)] = (window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (20.0 * 2.5)) + ((20.0 * 2.5) / 2.0) + 10.0) - idx * 10.0;
+                    let transform_into: [[f32; 4]; 4] = transformation.into();
+
                     target.draw(text_vertex, text_indices, &text_program, &uniform! { transform_matrix: transform_into, projection_matrix: orthographic_matrix, sampler: text_image, character: (ch - b'0') as i32 }, &empty_params).unwrap();
+                    idx -= 1.0;
                 }
             }
         }
-        
+
         target.finish().unwrap();
 
         let ms = start.elapsed().as_secs() * 1000;
