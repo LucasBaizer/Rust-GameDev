@@ -13,6 +13,7 @@ mod utils;
 mod game;
 mod input;
 mod net;
+mod quaternion;
 
 #[derive(Clone, Copy)]
 pub struct Instance {
