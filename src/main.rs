@@ -14,6 +14,7 @@ mod game;
 mod input;
 mod net;
 mod quaternion;
+mod nbt;
 
 #[derive(Clone, Copy)]
 pub struct Instance {
@@ -32,6 +33,7 @@ fn main() {
     use net::NetClient;
     use game::ItemStack;
     use game::Player;
+    use quaternion::Quaternion;
 
     let mut player = Player::new();
 
@@ -49,8 +51,10 @@ fn main() {
     let mut display = glium::backend::glutin::Display::new(window, context, &events_loop).unwrap();
     let window_size = display.get_framebuffer_dimensions();
     let perlin = Perlin::new();
-    //perlin.set_seed(rand::thread_rng().gen::<usize>());
-    perlin.set_seed(1);
+    let seed = rand::thread_rng().gen::<usize>();
+    println!("{:?}", seed);
+    perlin.set_seed(seed);
+    // perlin.set_seed(1);
 
     display.gl_window().window().set_cursor_state(glium::glutin::CursorState::Hide).unwrap();
 
@@ -245,6 +249,36 @@ fn main() {
             },
             None => ()
         }
+
+        let selected_index = player.selected_index;
+        {
+            let hb = player.get_hotbar();
+            if !hb[selected_index as usize].is_empty() {
+                let mut vec = Vec::with_capacity(1);
+                let mut mat = utils::get_identity_matrix();
+                mat[(0, 3)] = 0.2;
+                mat[(1, 3)] = -0.2;
+                mat[(2, 3)] = 0.25;
+                mat[(0, 0)] = 0.25;
+                mat[(1, 1)] = 0.25;
+                mat[(2, 2)] = 0.25;
+                
+                // println!("{:?}", camera.forward());
+                let mut rot = nalgebra::Matrix4::<f32>::from_euler_angles(0.0, camera.rot_x, 0.0);
+                //mat *= rot;
+
+                vec.push(Instance {
+                    matrix: mat.into(),
+                    id: hb[selected_index as usize].id
+                });
+
+                let mut arr = utils::get_identity_matrix();
+                let into_array: [[f32; 4]; 4] = arr.into();
+
+                target.draw((vertex_buffer, glium::VertexBuffer::new(&mut display, &vec).unwrap().per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, view_matrix: into_array, projection_matrix: projection_matrix, total_blocks: blocks_count }, params).unwrap();
+            }
+        }
+
         target.draw(crosshair_buffer, crosshair_indices, &flat_program, &uniform! { transform_matrix: crosshair_matrix, projection_matrix: orthographic_matrix, sampler: crosshair }, &empty_params).unwrap();
         target.draw(hotbar_buffer, hotbar_indices, &flat_program, &uniform! { transform_matrix: hotbar_matrix, projection_matrix: orthographic_matrix, sampler: hotbar }, &empty_params).unwrap();
 
@@ -256,57 +290,61 @@ fn main() {
         hotbar_selected_matrix[(1, 1)] = w;
         hotbar_selected_matrix[(2, 2)] = w;
 
-        hotbar_selected_matrix[(0, 3)] = (window_size.0 as f32) / 2.0 - (91.0 * 2.5) + (player.selected_index as f32 * (20.0 * 2.5)) - 1.0;
+        hotbar_selected_matrix[(0, 3)] = (window_size.0 as f32) / 2.0 - (91.0 * 2.5) + (selected_index as f32 * (20.0 * 2.5)) - 1.0;
         hotbar_selected_matrix[(1, 3)] = 32.0;
         hotbar_selected_matrix[(2, 3)] = -1.0;
 
         let into: [[f32; 4]; 4] = hotbar_selected_matrix.into();
         target.draw(hotbar_selected_buffer, hotbar_selected_indices, &flat_program, &uniform! { transform_matrix: into, projection_matrix: orthographic_matrix, sampler: hotbar_selected }, &empty_params).unwrap();
 
-        for i in 0..9 {
+        {
             let hb = player.get_hotbar();
-            if !hb[i].is_empty() {
-                let mut transformation = utils::get_identity_matrix();
-                let rot: nalgebra::Matrix4<f32> = nalgebra::Matrix4::from_euler_angles(f32::to_radians(-30.0), 0.0, 0.0) * nalgebra::Matrix4::from_euler_angles(0.0, f32::to_radians(-45.0), 0.0);
+            for i in 0..9 {
+                if !hb[i].is_empty() {
+                    let mut transformation = utils::get_identity_matrix();
+                    let q = Quaternion::from_axis_angle(0.0, 1.0, 0.0, f32::to_radians(-45.0));
+                    let r = Quaternion::from_axis_angle(1.0, 0.0, 0.0, f32::to_radians(30.0));
+                    let rot: nalgebra::Matrix4<f32> = (q*r).into_matrix();//Quaternion::from_euler_angles(0.0, f32::to_radians(-45.0), f32::to_radians(-30.0)).into_matrix();
 
-                let w = 22.0 * 2.5 / 2.0;
+                    let w = 22.0 * 2.5 / 2.0;
 
-                transformation[(0, 0)] = w * 0.8;
-                transformation[(1, 1)] = w * 0.8;
-                transformation[(2, 2)] = w * 0.8;
+                    transformation[(0, 0)] = w * 0.8;
+                    transformation[(1, 1)] = w * 0.8;
+                    transformation[(2, 2)] = w * 0.8;
 
-                transformation[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (20.0 * 2.5)) + ((20.0 * 2.5) / 2.0) + 3.0;
-                transformation[(1, 3)] = 33.0 + ((22.0 * 2.5) / 2.0) - 1.0;
-                transformation[(2, 3)] = -33.0;
+                    transformation[(0, 3)] = window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (20.0 * 2.5)) + ((20.0 * 2.5) / 2.0) + 3.0;
+                    transformation[(1, 3)] = 33.0 + ((22.0 * 2.5) / 2.0) - 1.0;
+                    transformation[(2, 3)] = -33.0;
 
-                let rotated = transformation * rot;
+                    let rotated = transformation * rot;
 
-                let instance = glium::VertexBuffer::new(&mut display, 
-                    &vec![
-                        Instance {
-            			    matrix: rotated.into(),
-            		    	id: hb[i].id
-                        }
-                    ]).unwrap();
-                let into: [[f32; 4]; 4] = utils::get_identity_matrix().into();
-                target.draw((vertex_buffer, instance.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, projection_matrix: orthographic_matrix, view_matrix: into, total_blocks: blocks_count }, params ).unwrap();
-                
-                let txt = hb[i].count.to_string();
-                let mut transformation = utils::get_identity_matrix();
-                transformation[(0, 0)] = w * 0.5;
-                transformation[(1, 1)] = w * 0.5;
-                transformation[(2, 2)] = w * 0.5;
+                    let instance = glium::VertexBuffer::new(&mut display, 
+                        &vec![
+                            Instance {
+                                matrix: rotated.into(),
+                                id: hb[i].id
+                            }
+                        ]).unwrap();
+                    let into: [[f32; 4]; 4] = utils::get_identity_matrix().into();
+                    target.draw((vertex_buffer, instance.per_instance().unwrap()), index_buffer, &program, &uniform! { sampler: sampler, projection_matrix: orthographic_matrix, view_matrix: into, total_blocks: blocks_count }, params ).unwrap();
+                    
+                    let txt = hb[i].count.to_string();
+                    let mut transformation = utils::get_identity_matrix();
+                    transformation[(0, 0)] = w * 0.5;
+                    transformation[(1, 1)] = w * 0.5;
+                    transformation[(2, 2)] = w * 0.5;
 
-                transformation[(1, 3)] = 33.0 + (w * 0.3);
-                transformation[(2, 3)] = -1.0;
+                    transformation[(1, 3)] = 33.0 + (w * 0.3);
+                    transformation[(2, 3)] = -1.0;
 
-                let mut idx = txt.len() as f32 - 1.0;
-                for ch in txt.bytes() {
-                    transformation[(0, 3)] = (window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (20.0 * 2.5)) + ((20.0 * 2.5) / 2.0) + 10.0) - idx * 10.0;
-                    let transform_into: [[f32; 4]; 4] = transformation.into();
+                    let mut idx = txt.len() as f32 - 1.0;
+                    for ch in txt.bytes() {
+                        transformation[(0, 3)] = (window_size.0 as f32 / 2.0 - (91.0 * 2.5) + (i as f32 * (20.0 * 2.5)) + ((20.0 * 2.5) / 2.0) + 10.0) - idx * 10.0;
+                        let transform_into: [[f32; 4]; 4] = transformation.into();
 
-                    target.draw(text_vertex, text_indices, &text_program, &uniform! { transform_matrix: transform_into, projection_matrix: orthographic_matrix, sampler: text_image, character: (ch - b'0') as i32 }, &empty_params).unwrap();
-                    idx -= 1.0;
+                        target.draw(text_vertex, text_indices, &text_program, &uniform! { transform_matrix: transform_into, projection_matrix: orthographic_matrix, sampler: text_image, character: (ch - b'0') as i32 }, &empty_params).unwrap();
+                        idx -= 1.0;
+                    }
                 }
             }
         }
@@ -403,7 +441,7 @@ fn main() {
                        dx = (screen_size.0 / 2) as f32 - position.0 as f32;
                        dy = (screen_size.1 / 2) as f32 - position.1 as f32;
                        camera.rot_x += dx / 10.0 / (180.0 / std::f32::consts::PI);
-                       camera.rot_y = utils::clamp(camera.rot_y, -(3.14 / 2.0), 3.14 / 2.0);
+                       camera.rot_y = utils::clamp(camera.rot_y, -(std::f32::consts::PI / 2.0), std::f32::consts::PI / 2.0);
 
                        camera.rot_y += dy / 10.0 / (180.0 / std::f32::consts::PI);
                     },

@@ -171,14 +171,16 @@ impl ItemStack {
 
 pub struct Player {
 	inventory: [[ItemStack; 9]; 4],
-	pub selected_index: u8
+	pub selected_index: u8,
+	pub health: u8
 }
 
 impl Player {
 	pub fn new() -> Player {
 		Player {
 			inventory: [[ItemStack::new(0, 0, 64); 9]; 4],
-			selected_index: 0
+			selected_index: 0,
+			health: 100
 		}
 	}
 
@@ -402,12 +404,3 @@ pub struct Vertex {
     pub uv: [f32; 2],
     pub face: u8
 }
-
-/*impl Vertex {
-    pub fn new() -> Vertex {
-        Vertex {
-            position: [0.0; 3],
-            uv: [0.0; 2]
-        }
-    }
-}*/

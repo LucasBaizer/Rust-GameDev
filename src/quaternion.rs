@@ -19,31 +19,22 @@ impl Quaternion {
         }
     }
 
-    pub fn from_euler_angles(pitch: f32, roll: f32, yaw: f32) -> Quaternion {
-        let cy = f32::cos(yaw * 0.5);
-        let sy = f32::sin(yaw * 0.5);
-        let cr = f32::cos(roll * 0.5);
-        let sr = f32::sin(roll * 0.5);
-        let cp = f32::cos(pitch * 0.5);
-        let sp = f32::sin(pitch * 0.5);
-
-        println!("cy: {:?}", cy);
-        println!("sy: {:?}", sy);
-        println!("cr: {:?}", cr);
-        println!("sr: {:?}", sr);
-        println!("cp: {:?}", cp);
-        println!("sp: {:?}", sp);
-
+    pub fn from_euler_angles(roll: f32, pitch: f32, yaw: f32) -> Quaternion {
         Quaternion {
-            w: cy * cr * cp + sy * sr * sp,
-            x: cy * sr * cp - sy * cr * sp,
-            y: cy * cr * sp + sy * sr * cp,
-            z: sy * cr * cp - cy * sr * sp
+            w: f32::cos(roll / 2.0) * f32::cos(pitch / 2.0) * f32::cos(yaw / 2.0) + f32::sin(roll / 2.0) * f32::sin(pitch / 2.0) * f32::sin(yaw / 2.0),
+            z: f32::sin(roll / 2.0) * f32::cos(pitch / 2.0) * f32::cos(yaw / 2.0) - f32::cos(roll / 2.0) * f32::sin(pitch / 2.0) * f32::sin(yaw / 2.0),
+            x: f32::cos(roll / 2.0) * f32::sin(pitch / 2.0) * f32::cos(yaw / 2.0) + f32::sin(roll / 2.0) * f32::cos(pitch / 2.0) * f32::sin(yaw / 2.0),
+            y: f32::cos(roll / 2.0) * f32::cos(pitch / 2.0) * f32::sin(yaw / 2.0) - f32::sin(roll / 2.0) * f32::sin(pitch / 2.0) * f32::cos(yaw / 2.0)
         }
     }
 
     pub fn from_axis_angle(x: f32, y: f32, z: f32, angle: f32) -> Quaternion {
-        unimplemented!()
+        Quaternion {
+            x: x * f32::sin(angle / 2.0),
+            y: y * f32::sin(angle / 2.0),
+            z: z * f32::sin(angle / 2.0),
+            w: f32::cos(angle / 2.0)
+        }
     }
     
     
@@ -60,33 +51,83 @@ impl Quaternion {
     }
 
     pub fn into_matrix(self) -> nalgebra::core::Matrix4<f32> {
-        unimplemented!()
+        let mut array: [[f32; 4]; 4] = [[0.0; 4]; 4];
+
+        array[0][0] = 1.0 - 2.0 * f32::powi(self.y, 2) - 2.0 * f32::powi(self.z, 2);
+        array[0][1] = 2.0 * self.x * self.y - 2.0 * self.z * self.w;
+        array[0][2] = 2.0 * self.x * self.z + 2.0 * self.y * self.w;
+        array[1][0] = 2.0 * self.x * self.y + 2.0 * self.z * self.w;
+        array[1][1] = 1.0 - 2.0 * f32::powi(self.x, 2) - 2.0 * f32::powi(self.z, 2);
+        array[2][1] = 2.0 * self.y * self.z + 2.0 * self.x * self.w;
+        array[2][0] = 2.0 * self.x * self.z - 2.0 * self.y * self.w;
+        array[2][1] = 2.0 * self.y * self.z + 2.0 * self.x * self.w;
+        array[2][2] = 1.0 - 2.0 * f32::powi(self.x, 2) - 2.0 * f32::powi(self.y, 2);
+        array[3][3] = 1.0;
+
+        array.into()
     }
 
-    pub fn slerp(&self, dst: Quaternion, t: f32) -> Quaternion {
-        unimplemented!()
+    pub fn slerp(&self, qb: Quaternion, t: f32) -> Quaternion {
+        let cos_half_theta = self.w * qb.w + self.x * qb.x + self.y * qb.y + self.z * qb.z;
+        // if qa=qb or qa=-qb then theta = 0 and we can return qa
+        if f32::abs(cos_half_theta) >= 1.0 {
+            Quaternion {
+                w: self.w,
+                x: self.x,
+                y: self.y,
+                z: self.z
+            }
+        } else {
+            let half_theta = f32::acos(cos_half_theta);
+            let sin_half_theta = f32::sqrt(1.0 - f32::powi(cos_half_theta, 2));
+            // if theta = 180 degrees then result is not fully defined
+            // we could rotate around any axis normal to qa or qb
+            if f32::abs(sin_half_theta) < 0.001 { // fabs is floating point absolute
+                Quaternion {
+                    w: (self.w * 0.5 + qb.w * 0.5),
+                    x: (self.x * 0.5 + qb.x * 0.5),
+                    y: (self.y * 0.5 + qb.y * 0.5),
+                    z: (self.z * 0.5 + qb.z * 0.5)
+                }
+            } else {
+                let ratio_a = f32::sin((1.0 - t) * half_theta) / sin_half_theta;
+                let ratio_b = f32::sin(t * half_theta) / sin_half_theta; 
+                //calculate Quaternion.
+                Quaternion {
+                    w: (self.w * ratio_a + qb.w * ratio_b),
+                    x: (self.x * ratio_a + qb.x * ratio_b),
+                    y: (self.y * ratio_a + qb.y * ratio_b),
+                    z: (self.z * ratio_a + qb.z * ratio_b)
+                }
+            }
+        }
     }
 }
 
 impl ops::Mul<Quaternion> for Quaternion {
     type Output = Quaternion;
 
-    fn mul(self, rhs: Quaternion) -> Quaternion {
+    fn mul(self, q2: Quaternion) -> Quaternion {
         Quaternion {
-            w: self.w * rhs.w - self.x * rhs.x - self.y * rhs.y - self.z * rhs.z,
-            x: self.w * rhs.x + self.x * rhs.w + self.y * rhs.z - self.z * rhs.y,
-            y: self.w * rhs.y + self.y * rhs.w + self.z * rhs.x - self.x * rhs.z,
-            z: self.w * rhs.z + self.z * rhs.w + self.x * rhs.y - self.y * rhs.x
+            x: self.x * q2.w + self.y * q2.z - self.z * q2.y + self.w * q2.x,
+            y: -self.x * q2.z + self.y * q2.w + self.z * q2.x + self.w * q2.y,
+            z: self.x * q2.y - self.y * q2.x + self.z * q2.w + self.w * q2.z,
+            w: -self.x * q2.x - self.y * q2.y - self.z * q2.z + self.w * q2.w
         }
     }
 }
 
 impl ops::MulAssign<Quaternion> for Quaternion {
-    fn mul_assign(&mut self, rhs: Quaternion) {
-        self.w = self.w * rhs.w - self.x * rhs.x - self.y * rhs.y - self.z * rhs.z;
-        self.x = self.w * rhs.x + self.x * rhs.w + self.y * rhs.z - self.z * rhs.y;
-        self.y = self.w * rhs.y + self.y * rhs.w + self.z * rhs.x - self.x * rhs.z;
-        self.z = self.w * rhs.z + self.z * rhs.w + self.x * rhs.y - self.y * rhs.x;
+    fn mul_assign(&mut self, q2: Quaternion) {
+        let x =  self.x * q2.w + self.y * q2.z - self.z * q2.y + self.w * q2.x;
+        let y = -self.x * q2.z + self.y * q2.w + self.z * q2.x + self.w * q2.y;
+        let z =  self.x * q2.y - self.y * q2.x + self.z * q2.w + self.w * q2.z;
+        let w = -self.x * q2.x - self.y * q2.y - self.z * q2.z + self.w * q2.w;
+    
+        self.x = x;
+        self.y = y;
+        self.z = z;
+        self.w = w;
     }
 }
 
@@ -149,7 +190,7 @@ mod tests {
     #[test]
     fn test_euler_angles() {
         let q = Quaternion::from_euler_angles(0.0, 0.0, PI);
-        assert_rot_eq(q, Quaternion { x: 0.0, y: 0.0, z: 1.0, w: 0.0 });
+        assert_rot_eq(q, Quaternion { x: 0.0, y: 1.0, z: 0.0, w: 0.0 });
 
         let q = Quaternion::from_euler_angles(0.0, PI * 2.0, 0.0);
         assert_rot_eq(q, Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 });
