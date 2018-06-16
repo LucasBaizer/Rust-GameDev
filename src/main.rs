@@ -100,10 +100,11 @@ fn main() {
 
     let blocks_count: f32 = blocks.block_map.len() as f32 - 1.0;
 
-    let mut game: game::Game = game::Game::new(0, 16);
-    for x in 0..255 {
-        for z in 0..255 {
-            let height: u8 = 64 + ((perlin.get([x as f32 / 10.0 + 0.5, z as f32 / 10.0 + 0.5])) * 4.0) as u8;
+    let mut game: game::Game = game::Game::new(0, 64);
+    for x in 0..1023 {
+        for z in 0..1023 {
+            // let height: u8 = 64 + ((perlin.get([x as f32 / 10.0 + 0.5, z as f32 / 10.0 + 0.5])) * 4.0) as u8;
+            let height: u8 = 60;
             for y in 0..height {
                 let mut block = 1;
                 if height - y <= 4 {

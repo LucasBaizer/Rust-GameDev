@@ -11,123 +11,135 @@ pub struct Quaternion {
 
 impl Quaternion {
     pub fn identity() -> Quaternion {
-        Quaternion {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0
-        }
+        Quaternion { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }
     }
 
-    pub fn from_euler_angles(roll: f32, pitch: f32, yaw: f32) -> Quaternion {
+    pub fn from_euler_angles(yaw: f32, pitch: f32, roll: f32) -> Quaternion {
+        let yaw_c = (yaw * 0.5).cos();
+        let yaw_s = (yaw * 0.5).sin();
+        let pitch_c = (pitch * 0.5).cos();
+        let pitch_s = (pitch * 0.5).sin();
+        let roll_c = (roll * 0.5).cos();
+        let roll_s = (roll * 0.5).sin();
+
         Quaternion {
-            w: f32::cos(roll / 2.0) * f32::cos(pitch / 2.0) * f32::cos(yaw / 2.0) + f32::sin(roll / 2.0) * f32::sin(pitch / 2.0) * f32::sin(yaw / 2.0),
-            z: f32::sin(roll / 2.0) * f32::cos(pitch / 2.0) * f32::cos(yaw / 2.0) - f32::cos(roll / 2.0) * f32::sin(pitch / 2.0) * f32::sin(yaw / 2.0),
-            x: f32::cos(roll / 2.0) * f32::sin(pitch / 2.0) * f32::cos(yaw / 2.0) + f32::sin(roll / 2.0) * f32::cos(pitch / 2.0) * f32::sin(yaw / 2.0),
-            y: f32::cos(roll / 2.0) * f32::cos(pitch / 2.0) * f32::sin(yaw / 2.0) - f32::sin(roll / 2.0) * f32::sin(pitch / 2.0) * f32::cos(yaw / 2.0)
+            x: pitch_s * yaw_c * roll_c + pitch_c * yaw_s * roll_s,
+			y: pitch_c * yaw_s * roll_c - pitch_s * yaw_c * roll_s,
+			z: pitch_c * yaw_c * roll_s - pitch_s * yaw_s * roll_c,
+			w: pitch_c * yaw_c * roll_c + pitch_s * yaw_s * roll_s,
         }
     }
 
     pub fn from_axis_angle(x: f32, y: f32, z: f32, angle: f32) -> Quaternion {
+        let sin = (angle / 2.0).sin();
+        let cos = (angle / 2.0).cos();
         Quaternion {
-            x: x * f32::sin(angle / 2.0),
-            y: y * f32::sin(angle / 2.0),
-            z: z * f32::sin(angle / 2.0),
-            w: f32::cos(angle / 2.0)
+            x: x * sin,
+            y: y * sin,
+            z: z * sin,
+            w: cos,
         }
     }
     
     
     pub fn len(&self) -> f32 {
-        f32::sqrt(f32::powi(self.w, 2) + f32::powi(self.x, 2) + f32::powi(self.y, 2) + f32::powi(self.z, 2))
+        (self.x*self.x + self.y*self.y + self.z*self.z + self.w*self.w).sqrt()
     }
     
     pub fn normalize(&mut self) {
-        let len = self.len();
-        self.w = self.w / len;
-        self.x = self.x / len;
-        self.y = self.y / len;
-        self.z = self.z / len;
+        let inv_len = 1.0 / self.len();
+        self.x *= inv_len;
+        self.y *= inv_len;
+        self.z *= inv_len;
+        self.w *= inv_len;
     }
 
     pub fn into_matrix(self) -> nalgebra::core::Matrix4<f32> {
-        let mut array: [[f32; 4]; 4] = [[0.0; 4]; 4];
+        let mut m = nalgebra::core::Matrix4::identity();
+        let x = self.x;
+        let y = self.y;
+        let z = self.z;
+        let w = self.w;
+        m[(0,0)] = 1.0 - 2.0*y*y - 2.0*z*z;
+        m[(0,1)] = 2.0*x*y - 2.0*z*w;
+        m[(0,2)] = 2.0*x*z + 2.0*y*w;
 
-        array[0][0] = 1.0 - 2.0 * f32::powi(self.y, 2) - 2.0 * f32::powi(self.z, 2);
-        array[0][1] = 2.0 * self.x * self.y - 2.0 * self.z * self.w;
-        array[0][2] = 2.0 * self.x * self.z + 2.0 * self.y * self.w;
-        array[1][0] = 2.0 * self.x * self.y + 2.0 * self.z * self.w;
-        array[1][1] = 1.0 - 2.0 * f32::powi(self.x, 2) - 2.0 * f32::powi(self.z, 2);
-        array[2][1] = 2.0 * self.y * self.z + 2.0 * self.x * self.w;
-        array[2][0] = 2.0 * self.x * self.z - 2.0 * self.y * self.w;
-        array[2][1] = 2.0 * self.y * self.z + 2.0 * self.x * self.w;
-        array[2][2] = 1.0 - 2.0 * f32::powi(self.x, 2) - 2.0 * f32::powi(self.y, 2);
-        array[3][3] = 1.0;
+        m[(1,0)] = 2.0*x*y + 2.0*z*w;
+        m[(1,1)] = 1.0 - 2.0*x*x - 2.0*z*z;
+        m[(1,2)] = 2.0*y*z - 2.0*x*w;
 
-        array.into()
+        m[(2,0)] = 2.0*x*z - 2.0*y*w;
+        m[(2,1)] = 2.0*y*z + 2.0*x*w;
+        m[(2,2)] = 1.0 - 2.0*x*x - 2.0*y*y;
+
+        m
     }
 
-    pub fn slerp(&self, qb: Quaternion, t: f32) -> Quaternion {
-        let cos_half_theta = self.w * qb.w + self.x * qb.x + self.y * qb.y + self.z * qb.z;
-        // if qa=qb or qa=-qb then theta = 0 and we can return qa
-        if f32::abs(cos_half_theta) >= 1.0 {
-            Quaternion {
-                w: self.w,
-                x: self.x,
-                y: self.y,
-                z: self.z
-            }
-        } else {
-            let half_theta = f32::acos(cos_half_theta);
-            let sin_half_theta = f32::sqrt(1.0 - f32::powi(cos_half_theta, 2));
-            // if theta = 180 degrees then result is not fully defined
-            // we could rotate around any axis normal to qa or qb
-            if f32::abs(sin_half_theta) < 0.001 { // fabs is floating point absolute
-                Quaternion {
-                    w: (self.w * 0.5 + qb.w * 0.5),
-                    x: (self.x * 0.5 + qb.x * 0.5),
-                    y: (self.y * 0.5 + qb.y * 0.5),
-                    z: (self.z * 0.5 + qb.z * 0.5)
-                }
-            } else {
-                let ratio_a = f32::sin((1.0 - t) * half_theta) / sin_half_theta;
-                let ratio_b = f32::sin(t * half_theta) / sin_half_theta; 
-                //calculate Quaternion.
-                Quaternion {
-                    w: (self.w * ratio_a + qb.w * ratio_b),
-                    x: (self.x * ratio_a + qb.x * ratio_b),
-                    y: (self.y * ratio_a + qb.y * ratio_b),
-                    z: (self.z * ratio_a + qb.z * ratio_b)
-                }
-            }
+    pub fn slerp(&self, mut dst: Quaternion, t: f32) -> Quaternion {
+        let mut dot = self.x*dst.x + self.y*dst.y + self.z*dst.z + self.w*dst.w;
+
+        if dot < 0.0 {
+            dst.x = -dst.x;
+            dst.y = -dst.y;
+            dst.z = -dst.z;
+            dst.w = -dst.w;
+            dot = -dot;
         }
+
+        if dot >= 0.999 {
+            let mut q = Quaternion {
+                x: self.x + t*(dst.x - self.x),
+                y: self.y + t*(dst.y - self.y),
+                z: self.z + t*(dst.z - self.z),
+                w: self.w + t*(dst.w - self.w),
+            };
+            q.normalize();
+            return q;
+        }
+
+        let theta0 = dot.acos();
+        let theta = theta0*t;
+        let sin_theta = theta.sin();
+        let sin_theta0 = theta0.sin();
+
+        let s0 = theta.cos() - dot * sin_theta / sin_theta0;
+        let s1 = sin_theta / sin_theta0;
+
+        let mut q = Quaternion {
+            x: s0 * self.x + s1 * dst.x,
+            y: s0 * self.y + s1 * dst.y,
+            z: s0 * self.z + s1 * dst.z,
+            w: s0 * self.w + s1 * dst.w,
+        };
+        q.normalize();
+        q
     }
 }
 
 impl ops::Mul<Quaternion> for Quaternion {
     type Output = Quaternion;
 
-    fn mul(self, q2: Quaternion) -> Quaternion {
-        Quaternion {
-            x: self.x * q2.w + self.y * q2.z - self.z * q2.y + self.w * q2.x,
-            y: -self.x * q2.z + self.y * q2.w + self.z * q2.x + self.w * q2.y,
-            z: self.x * q2.y - self.y * q2.x + self.z * q2.w + self.w * q2.z,
-            w: -self.x * q2.x - self.y * q2.y - self.z * q2.z + self.w * q2.w
-        }
+    fn mul(self, rhs: Quaternion) -> Quaternion {
+        let mut q = Quaternion {
+            x: self.x * rhs.w + self.y * rhs.z - self.z * rhs.y + self.w * rhs.x,
+            y: -self.x * rhs.z + self.y * rhs.w + self.z * rhs.x + self.w * rhs.y,
+            z: self.x * rhs.y - self.y * rhs.x + self.z * rhs.w + self.w * rhs.z,
+            w: -self.x * rhs.x - self.y * rhs.y - self.z * rhs.z + self.w * rhs.w,
+        };
+        q.normalize();
+        q
     }
 }
 
 impl ops::MulAssign<Quaternion> for Quaternion {
-    fn mul_assign(&mut self, q2: Quaternion) {
-        let x =  self.x * q2.w + self.y * q2.z - self.z * q2.y + self.w * q2.x;
-        let y = -self.x * q2.z + self.y * q2.w + self.z * q2.x + self.w * q2.y;
-        let z =  self.x * q2.y - self.y * q2.x + self.z * q2.w + self.w * q2.z;
-        let w = -self.x * q2.x - self.y * q2.y - self.z * q2.z + self.w * q2.w;
-    
-        self.x = x;
-        self.y = y;
-        self.z = z;
-        self.w = w;
+    fn mul_assign(&mut self, rhs: Quaternion) {
+        *self = Quaternion {
+            x: self.x * rhs.w + self.y * rhs.z - self.z * rhs.y + self.w * rhs.x,
+            y: -self.x * rhs.z + self.y * rhs.w + self.z * rhs.x + self.w * rhs.y,
+            z: self.x * rhs.y - self.y * rhs.x + self.z * rhs.w + self.w * rhs.z,
+            w: -self.x * rhs.x - self.y * rhs.y - self.z * rhs.z + self.w * rhs.w,
+        };
+        self.normalize();
     }
 }
 
