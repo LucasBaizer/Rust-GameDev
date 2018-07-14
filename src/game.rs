@@ -1,19 +1,18 @@
 pub struct Game {
-	pub world: World,
-	pub render_distance: u8
+	pub world: World
 }
 
 impl Game {
 	pub fn new(air_block: u8, render_distance: u8) -> Game {
 		Game {
 			world: create_world(air_block, render_distance as usize),
-			render_distance: render_distance
 		}
 	}
 }
 
 pub struct World {
-	pub chunks: Vec<Vec<Chunk>>
+	pub chunks: Vec<Vec<Chunk>>,
+	pub render_distance: u8
 }
 
 use Instance;
@@ -27,7 +26,7 @@ impl World {
 	}
 
 	pub fn is_solid_block(&self, x: f32, y: f32, z: f32) -> bool {
-		self.get_block_id((x + 0.5) as u32, (y + 0.5) as u8, (z + 0.5) as u32) > 0
+		self.is_in_rendered_world_bounds(x as i64, y as i16, z as i64) && self.get_block_id((x + 0.5) as u32, (y + 0.5) as u8, (z + 0.5) as u32) > 0
 	}
 
 	pub fn set_block(&mut self, x: u32, y: u8, z: u32, block: &Block) {
@@ -80,25 +79,29 @@ impl World {
 		if block != 0 {
 			for block_pos in &mut self.get_facial_neighbors(raw_x as i64, y as i16, raw_z as i64) {
 				if block_pos.block_id == 0 {
-					self.chunks[(raw_x >> 4) as usize][(raw_z >> 4) as usize].visible_blocks.insert(BlockPos::new(raw_x as u32, y, raw_z as u32, block));
+					self.chunks[(raw_x >> 4) as usize][(raw_z >> 4) as usize].visible_blocks.insert(BlockPos::new(raw_x, y, raw_z, block));
 					return;
 				}
 			}
 		}
 
-		self.chunks[(raw_x >> 4) as usize][(raw_z >> 4) as usize].visible_blocks.remove(&BlockPos::new(raw_x as u32, y, raw_z as u32, block));
+		self.chunks[(raw_x >> 4) as usize][(raw_z >> 4) as usize].visible_blocks.remove(&BlockPos::new(raw_x, y, raw_z, block));
 	}
 	
 	pub fn is_in_world_bounds(&self, x: i64, y: i16, z: i64) -> bool {
 		x >= 0 && z >= 0 && y >= 0 && y <= 255
 	}
 
-	pub fn is_in_rendered_world_bounds(&self, render_distance: u8, x: i64, y: i16, z: i64) -> bool {
-		x >= 0 && z >= 0 && y >= 0 && y <= 255 && x + 1 < render_distance as i64 * 16 && z + 1 < render_distance as i64 * 16
+	pub fn is_in_rendered_world_bounds(&self, x: i64, y: i16, z: i64) -> bool {
+		x >= 0 && z >= 0 && y >= 0 && y <= 255 && x < self.render_distance as i64 * 16 && z < self.render_distance as i64 * 16
+	}
+
+	pub fn is_visible(&self, x: u32, y: u8, z: u32) -> bool {
+		self.chunks[(x >> 4) as usize][(z >> 4) as usize].visible_blocks.contains(&BlockPos::new(x, y, z, 0))
 	}
 
 	fn add_if_in_bounds(&self, vec: &mut Vec<BlockPos>, x: i64, y: i16, z: i64) {
-		if self.is_in_world_bounds(x, y, z) {
+		if self.is_in_rendered_world_bounds(x, y, z) {
 			vec.push(BlockPos::new(x as u32, y as u8, z as u32, self.get_block_id(x as u32, y as u8, z as u32)));
 		} else {
 			vec.push(BlockPos::new(0, 0, 0, 0));
@@ -156,6 +159,14 @@ pub struct ItemStack {
 }
 
 impl ItemStack {
+	pub fn new_block(id: BlockType, count: u8) -> ItemStack {
+		ItemStack {
+			id: id as u8,
+			count: count,
+			max: 64
+		}
+	}
+
 	pub fn new(id: u8, count: u8, max: u8) -> ItemStack {
 		ItemStack {
 			id: id,
@@ -172,7 +183,9 @@ impl ItemStack {
 pub struct Player {
 	inventory: [[ItemStack; 9]; 4],
 	pub selected_index: u8,
-	pub health: u8
+	pub health: u8,
+	pub noclip: bool,
+	pub creative: bool
 }
 
 impl Player {
@@ -180,7 +193,9 @@ impl Player {
 		Player {
 			inventory: [[ItemStack::new(0, 0, 64); 9]; 4],
 			selected_index: 0,
-			health: 100
+			health: 100,
+			noclip: false,
+			creative: false
 		}
 	}
 
@@ -359,6 +374,10 @@ impl Blocks {
 		self.block_map.get(id as usize).unwrap()
 	}
 
+	pub fn block(&self, id: BlockType) -> &Block {
+		self.block_map.get(id as usize).unwrap()
+	}
+
 	pub fn get_block_count(&self) -> u8 {
 		self.block_map.len() as u8
 	}
@@ -375,7 +394,8 @@ pub fn create_world(air_block: u8, render_distance: usize) -> World {
 	}
 
 	World {
-		chunks: chunk_array
+		chunks: chunk_array,
+		render_distance: render_distance as u8
 	}
 }
 

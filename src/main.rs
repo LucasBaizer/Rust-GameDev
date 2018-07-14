@@ -33,9 +33,14 @@ fn main() {
     use net::NetClient;
     use game::ItemStack;
     use game::Player;
+    use game::BlockType;
     use quaternion::Quaternion;
 
     let mut player = Player::new();
+    player.noclip = true;
+    player.creative = true;
+
+    player.push_item(ItemStack::new_block(BlockType::Stone, 1));
 
     let mut camera: camera::Camera = camera::Camera::new(90);
     let mut game_input: input::Input = input::Input::new();
@@ -100,11 +105,11 @@ fn main() {
 
     let blocks_count: f32 = blocks.block_map.len() as f32 - 1.0;
 
-    let mut game: game::Game = game::Game::new(0, 64);
-    for x in 0..1023 {
-        for z in 0..1023 {
-            // let height: u8 = 64 + ((perlin.get([x as f32 / 10.0 + 0.5, z as f32 / 10.0 + 0.5])) * 4.0) as u8;
-            let height: u8 = 60;
+    let mut game: game::Game = game::Game::new(0, 2);
+    /*for x in 0..63 {
+        for z in 0..63 {
+            let height: u8 = 64 + ((perlin.get([x as f32 / 10.0 + 0.5, z as f32 / 10.0 + 0.5])) * 8.0) as u8;
+            // let height: u8 = 60;
             for y in 0..height {
                 let mut block = 1;
                 if height - y <= 4 {
@@ -116,7 +121,11 @@ fn main() {
                 game.world.set_block(x, y, z, blocks.get_block(block));
             }
         }
-    }
+    }*/
+    game.world.set_block(0, 0, 0, blocks.block(BlockType::Stone));
+    game.world.set_block(0, 0, 31, blocks.block(BlockType::Stone));
+    game.world.set_block(31, 0, 0, blocks.block(BlockType::Stone));
+    game.world.set_block(31, 0, 31, blocks.block(BlockType::Stone));
 
     let screen_size = display.get_framebuffer_dimensions();
 
@@ -192,16 +201,18 @@ fn main() {
         [window_size.0 as f32 / 2.0 - (91.0 * 2.5), 33.0, 0.0, 1.0]
     ];
 
-    camera.translate(utils::get_up_vector() * 72.0);
-    camera.translate(utils::get_right_vector() * 4.0);
-    camera.translate(utils::get_forward_vector() * 4.0);
+    camera.position = nalgebra::Vector3::new(31.0, 4.0, 31.0);
 
     let mut gravity_velocity: f32 = 0.0;
     let mut dx: f32 = 0.0;
     let mut dy: f32 = 0.0;
     let mut grounded = false;
+    let mut prev_time = Instant::now();
+    let mut cur_time = Instant::now();
     while !closed {
-        let start = Instant::now();
+        prev_time = cur_time;
+        cur_time = Instant::now();
+        let dt: f32 = (cur_time - prev_time).subsec_nanos() as f32 / 1_000_000_000.0;
 
         let mut target = display.draw();
         target.clear_color_and_depth((1.0, 1.0, 1.0, 1.0), 1.0);
@@ -230,6 +241,7 @@ fn main() {
                     match target_tuple.1 {
                         Some(new) => {
                             let index = player.selected_index;
+                            let creat = !player.creative;
                             let mut slctd = &mut player.get_hotbar()[index as usize];
                             if !slctd.is_empty() {
                                 let cam = camera.position;
@@ -240,7 +252,9 @@ fn main() {
                                     instance_buffer = game.world.get_instance_buffer(&mut display);
                                 }
 
-                                slctd.count -= 1;
+                                if creat {
+                                    slctd.count -= 1;
+                                }
                             }
                         },
                         None => ()
@@ -303,9 +317,9 @@ fn main() {
             for i in 0..9 {
                 if !hb[i].is_empty() {
                     let mut transformation = utils::get_identity_matrix();
-                    let q = Quaternion::from_axis_angle(0.0, 1.0, 0.0, f32::to_radians(-45.0));
-                    let r = Quaternion::from_axis_angle(1.0, 0.0, 0.0, f32::to_radians(30.0));
-                    let rot: nalgebra::Matrix4<f32> = (q*r).into_matrix();//Quaternion::from_euler_angles(0.0, f32::to_radians(-45.0), f32::to_radians(-30.0)).into_matrix();
+                    let a = Quaternion::from_euler_angles(f32::to_radians(45.0), 0.0, 0.0);
+                    let b = Quaternion::from_euler_angles(0.0, f32::to_radians(-30.0), 0.0);
+                    let rot: nalgebra::Matrix4<f32> = (b*a).into_matrix();
 
                     let w = 22.0 * 2.5 / 2.0;
 
@@ -352,16 +366,13 @@ fn main() {
 
         target.finish().unwrap();
 
-        let ms = start.elapsed().as_secs() * 1000;
-        if ms < 10 {
-            thread::sleep(Duration::from_millis(10 - ms));
-        }
-
         let old_pos = camera.position;
         let corner_positions = get_player_bounds(camera.position);
 
-        camera.translate(-utils::get_up_vector() * gravity_velocity);
-        gravity_velocity += 0.0055;
+        if !player.noclip {
+            camera.translate(-utils::get_up_vector() * gravity_velocity);
+            gravity_velocity += 0.25 * dt;
+        }
 
         let number_keys = [VirtualKeyCode::Key1, VirtualKeyCode::Key2, VirtualKeyCode::Key3, VirtualKeyCode::Key4, VirtualKeyCode::Key5, VirtualKeyCode::Key6, VirtualKeyCode::Key7, VirtualKeyCode::Key8, VirtualKeyCode::Key9];
         for i in 0..9 {
@@ -371,30 +382,88 @@ fn main() {
             }
         }
 
-        let speed = 0.05;
-        if game_input.get_key(VirtualKeyCode::W) {
-            let f = camera.forward_2d(speed);
-            if game_input.get_key(VirtualKeyCode::LShift) {
-                camera.translate(f * 1.5);
-            } else {
-                camera.translate(f);
+        let speed = 3.0;
+        if player.noclip {
+            if game_input.get_key(VirtualKeyCode::W) {
+                let f = camera.forward() * speed;
+                if game_input.get_key(VirtualKeyCode::LShift) {
+                    camera.translate(f * 1.5 * dt);
+                } else {
+                    camera.translate(f * dt);
+                }
+            } else if game_input.get_key(VirtualKeyCode::S) {
+                let b = -camera.forward() * speed;
+                camera.translate(b * dt);
             }
-        } else if game_input.get_key(VirtualKeyCode::S) {
-            let b = camera.forward_2d(-speed);
-            camera.translate(b);
+
+            if game_input.get_key(VirtualKeyCode::A) {
+                let r = -camera.right() * speed;
+                camera.translate(r * dt);
+            } else if game_input.get_key(VirtualKeyCode::D) {
+                let l = camera.right() * speed;
+                camera.translate(l * dt);
+            }
+
+            if game_input.get_key(VirtualKeyCode::Space) {
+                camera.translate(nalgebra::Vector3::new(0.0, speed, 0.0) * dt);
+            } else if game_input.get_key(VirtualKeyCode::LControl) {
+                camera.translate(nalgebra::Vector3::new(0.0, -speed, 0.0) * dt);
+            }
+        } else {
+            if game_input.get_key(VirtualKeyCode::W) {
+                let f = camera.forward_2d(speed);
+                if game_input.get_key(VirtualKeyCode::LShift) {
+                    camera.translate(f * 1.5 * dt);
+                } else {
+                    camera.translate(f * dt);
+                }
+            } else if game_input.get_key(VirtualKeyCode::S) {
+                let b = camera.forward_2d(-speed);
+                camera.translate(b * dt);
+            }
+
+            if game_input.get_key(VirtualKeyCode::A) {
+                let r = -camera.left_2d(speed);
+                camera.translate(r * dt);
+            } else if game_input.get_key(VirtualKeyCode::D) {
+                let l = camera.left_2d(speed);
+                camera.translate(l * dt);
+            }
+
+            if game_input.get_key(VirtualKeyCode::Space) {
+                if grounded {
+                    gravity_velocity = -0.1 * dt;
+                }
+            }
+
+            if game.world.is_in_rendered_world_bounds(old_pos.x as i64, old_pos.y as i16, old_pos.z as i64) {
+                let mut v = camera.position - old_pos;
+                let mut bottom_hit = false;
+                for i in 0..8 {
+                    let o = &mut corner_positions[i].clone();
+                    let mut n = &mut (corner_positions[i] + v);
+
+                    let result = constrain_camera(&game.world, o, &mut n, gravity_velocity);
+                    gravity_velocity = result.0;
+                    if i < 4 {
+                        bottom_hit = bottom_hit || result.1;
+                    }
+                
+                    v = *n - *o;
+                }
+                grounded = bottom_hit;
+                camera.position = old_pos + v;
+            }
         }
 
-        if game_input.get_key(VirtualKeyCode::A) {
-            let r = -camera.left_2d(speed);
-            camera.translate(r);
-        } else if game_input.get_key(VirtualKeyCode::D) {
-            let l = camera.left_2d(speed);
-            camera.translate(l);
+        if game_input.get_key_down(VirtualKeyCode::N) {
+            player.noclip = !player.noclip;
         }
-
-        if game_input.get_key(VirtualKeyCode::Space) {
-            if grounded {
-                gravity_velocity = -0.12;
+        if game_input.get_key_down(VirtualKeyCode::Q) {
+            let idx = player.selected_index;
+            let stack = &mut player.get_hotbar()[idx as usize];
+            if stack.count > 0 {
+                stack.count -= 1;
             }
         }
 
@@ -402,27 +471,9 @@ fn main() {
             return;
         }
 
-        if game.world.is_in_rendered_world_bounds(game.render_distance, old_pos.x as i64, old_pos.y as i16, old_pos.z as i64) {
-            let mut v = camera.position - old_pos;
-            let mut bottom_hit = false;
-            for i in 0..8 {
-                let o = &mut corner_positions[i].clone();
-                let mut n = &mut (corner_positions[i] + v);
-
-                let result = constrain_camera(&game.world, o, &mut n, gravity_velocity);
-                gravity_velocity = result.0;
-                if i < 4 {
-                    bottom_hit = bottom_hit || result.1;
-                }
-            
-                v = *n - *o;
-            }
-            grounded = bottom_hit;
-            camera.position = old_pos + v;
-        }
-
         game_input.set_button_down(MouseButton::Left, false);
         game_input.set_button_down(MouseButton::Right, false);
+        game_input.key_down_map.clear();
 
         events_loop.poll_events(|ev| {
             match ev {
@@ -430,7 +481,10 @@ fn main() {
                 	glutin::WindowEvent::Closed => closed = true,
                 	glutin::WindowEvent::KeyboardInput { input, .. } => match input.state {
                         glutin::ElementState::Pressed => match input.virtual_keycode {
-                            Some(key) => game_input.set_key(key, true),                 
+                            Some(key) => {
+                                game_input.set_key(key, true);
+                                game_input.set_key_down(key, true);
+                            },                 
                 		    _ => ()
                         },
                         glutin::ElementState::Released => match input.virtual_keycode {                 

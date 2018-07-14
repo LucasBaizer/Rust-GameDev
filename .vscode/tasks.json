@@ -12,7 +12,7 @@
         {
             "type": "shell",
             "label": "cargo run",
-            "command": "cargo",
+            "command": "RUST_BACKTRACE=1 cargo",
             "args": [
                 "run",
                 "--release"

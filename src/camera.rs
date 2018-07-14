@@ -83,20 +83,20 @@ impl Camera {
 		let mut jump = self.position;
 		let mut last = None;
 
-		for _ in 0..70 {
-			if game.world.is_in_rendered_world_bounds(game.render_distance, f32::round(jump[0]) as i64, f32::round(jump[1]) as i16, f32::round(jump[2]) as i64) {
+		for _ in 0..100 {
+			if game.world.is_in_rendered_world_bounds(f32::round(jump[0]) as i64, f32::round(jump[1]) as i16, f32::round(jump[2]) as i64) {
 				let ux = f32::round(jump[0]) as u32;
 				let uy = f32::round(jump[1]) as u8;
 				let uz = f32::round(jump[2]) as u32;
 				let id = game.world.get_block_id(ux, uy, uz);
-				if id != 0 {
+				if id != 0 && game.world.is_visible(f32::round(jump[0]) as u32, f32::round(jump[1]) as u8, f32::round(jump[2]) as u32) {
 					return (Some(game::BlockPos::new(ux, uy, uz, id)), last);
 				} else {
 					last = Some(game::BlockPos::new(ux, uy, uz, id));
 				}
 			}
 			
-			jump += self.forward() / 20.0;
+			jump += self.forward() / 25.0;
 		}
 
 		(None, last)
