@@ -1,0 +1,1 @@
+{"rustc":13120984837661113835,"features":"[\"default\", \"glutin\"]","target":10758323735694311660,"profile":2479238963835404001,"path":92055504127080121,"deps":[["gl_generator v0.5.5",12057342502009358564]],"local":[{"Precalculated":"0.17.1"}],"rustflags":[],"epoch":"Epoch2015"}

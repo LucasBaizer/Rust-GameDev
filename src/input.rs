@@ -5,7 +5,9 @@ pub struct Input {
     pub key_map: HashMap<VirtualKeyCode, bool>,
     pub key_down_map: HashMap<VirtualKeyCode, bool>,
     pub mouse_map: HashMap<MouseButton, bool>,
-    pub mouse_down_map: HashMap<MouseButton, bool>
+    pub mouse_down_map: HashMap<MouseButton, bool>,
+    pub mouse_x: f32,
+    pub mouse_y: f32
 }
 
 impl Input {
@@ -14,7 +16,9 @@ impl Input {
 			key_map: HashMap::new(),
             key_down_map: HashMap::new(),
             mouse_map: HashMap::new(),
-            mouse_down_map: HashMap::new()
+            mouse_down_map: HashMap::new(),
+            mouse_x: 0.0,
+            mouse_y: 0.0
 		}
 	}
 
