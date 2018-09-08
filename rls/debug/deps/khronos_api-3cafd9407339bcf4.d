@@ -1,9 +1,0 @@
-/Users/Administrator 1/Desktop/Rust-GameDev/rls/debug/deps/libkhronos_api-3cafd9407339bcf4.rlib: /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/lib.rs /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/gl.xml /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/egl.xml /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/wgl.xml /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/glx.xml
-
-/Users/Administrator 1/Desktop/Rust-GameDev/rls/debug/deps/khronos_api-3cafd9407339bcf4.d: /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/lib.rs /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/gl.xml /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/egl.xml /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/wgl.xml /Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/glx.xml
-
-/Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/lib.rs:
-/Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/gl.xml:
-/Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/egl.xml:
-/Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/wgl.xml:
-/Users/Administrator\ 1/.cargo/registry/src/github.com-1ecc6299db9ec823/khronos_api-1.0.1/src/../api/glx.xml:
